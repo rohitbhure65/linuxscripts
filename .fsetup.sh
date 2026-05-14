@@ -352,7 +352,6 @@ mkflutter() {
   _yes "$F_AUTOROUTE" && echo -e "    ${GREEN}✓${RESET} Auto Route"
 
   echo -e "  ${DIM}Dev/Quality:${RESET}"
-  _yes "$F_FLAVORS"          && echo -e "    ${GREEN}✓${RESET} Flavors (dev/staging/prod)"
   _yes "$F_UNIT_TEST"        && echo -e "    ${GREEN}✓${RESET} Unit Tests"
   _yes "$F_WIDGET_TEST"      && echo -e "    ${GREEN}✓${RESET} Widget Tests"
   _yes "$F_INTEGRATION_TEST" && echo -e "    ${GREEN}✓${RESET} Integration Tests"
@@ -572,6 +571,9 @@ mkflutter() {
   _dep ""
   _dep "  # ------- HTTP Client (Simple) --------"
   _dep "  http: ^1.6.0 # Simple HTTP client for basic API calls"
+  _dep ""
+  _dep "  # ------- App Store Utilities --------"
+  _dep "  get: ^4.7.3"
 
   # ── Dev dependencies ─────────────────────────────────────────────
   local _NEEDS_BUILD_RUNNER=false
@@ -4335,11 +4337,12 @@ EOF
 
   _dart "lib/core/utils/helpers/theme_helper.dart";cat > "${B}/lib/core/utils/helpers/theme_helper.dart" << EOF
 // ─────────────────────────────────────────────
-// 3. THEME HELPER  –  return correct token
-//    based on current brightness (light/dark mode).
-//    Usage:  AppColorScheme.of(context).surface
+// THEME HELPER  –  return correct token
+// based on current brightness (light/dark mode).
+// Usage:  AppColorScheme.of(context).surface
 // ─────────────────────────────────────────────
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:${PROJECT_NAME}/core/constants/app_colors.dart';
 
 class AppColorScheme {
@@ -4351,6 +4354,21 @@ class AppColorScheme {
   factory AppColorScheme.of(BuildContext context) {
     return AppColorScheme._(
       brightness: Theme.of(context).brightness,
+    );
+  }
+
+
+  static SystemUiOverlayStyle overlayStyle(Brightness brightness) {
+    final isDark = brightness == Brightness.dark;
+
+    return SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+      statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+      systemNavigationBarColor:
+          isDark ? AppColors.backgroundDark : AppColors.background,
+      systemNavigationBarIconBrightness:
+          isDark ? Brightness.light : Brightness.dark,
     );
   }
 
@@ -4608,19 +4626,8 @@ EOF
     _dart "lib/routes/guards/role_guard.dart"
   fi
 
-  _dart "lib/config/app_config.dart"
-  _dart "lib/config/environment.dart"
-  if _yes "$F_FLAVORS"; then
-    _dart "lib/config/flavors/dev_config.dart"
-    _dart "lib/config/flavors/staging_config.dart"
-    _dart "lib/config/flavors/prod_config.dart"
-  fi
-
   _dart "lib/app.dart"
   _dart "lib/main.dart"
-  _yes "$F_FLAVORS" && _dart "lib/main_dev.dart"
-  _yes "$F_FLAVORS" && _dart "lib/main_staging.dart"
-  _yes "$F_FLAVORS" && _dart "lib/main_prod.dart"
 
   if _yes "$F_UNIT_TEST"; then
     _dart "test/unit/features/auth/auth_usecase_test.dart"
@@ -6038,7 +6045,6 @@ $(
   _yes "$F_BLUETOOTH"     && echo "- Bluetooth (flutter_blue_plus)"
   _yes "$F_DEEPLINK"      && echo "- Deep links / App links"
   _yes "$F_CONNECTIVITY"  && echo "- Connectivity monitoring"
-  _yes "$F_FLAVORS"       && echo "- Multi-flavor builds (dev / staging / prod)"
   _yes "$F_CICD"          && echo "- GitHub Actions CI/CD pipeline"
 )
 
@@ -6271,11 +6277,4 @@ EOF
   $_NEEDS_BUILD_RUNNER && echo -e "  ${GREEN}flutter pub run build_runner build --delete-conflicting-outputs${RESET}"
   echo -e "  ${GREEN}flutter run${RESET}"
   echo ""
-  if _yes "$F_FLAVORS"; then
-    echo -e "  ${YELLOW}🎨 Flavors:${RESET}"
-    echo -e "  ${GREEN}make run-dev${RESET}       ${DIM}# development${RESET}"
-    echo -e "  ${GREEN}make run-staging${RESET}   ${DIM}# staging${RESET}"
-    echo -e "  ${GREEN}make run-prod${RESET}      ${DIM}# production${RESET}"
-    echo ""
-  fi
 }
