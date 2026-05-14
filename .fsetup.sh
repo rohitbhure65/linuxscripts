@@ -2334,7 +2334,6 @@ EOF
   if [[ "$API_CHOICE" == "3" || "$API_CHOICE" == "5" ]]; then
     _dart "lib/core/network/api/api_firebase.dart"
   fi
-  _yes "$F_CONNECTIVITY" && _dart "lib/core/network/connectivity/connectivity_service.dart"
 
 # ── 1. CACHE KEYS ────────────────────────────────────────────
 _dart "lib/core/cache/cache_keys.dart"; cat > "${B}/lib/core/cache/cache_keys.dart" << EOF
@@ -3260,7 +3259,7 @@ EOF
 
 
 # ── Connectivity Service ────────────────────────────────────────────
-_dart "lib/core/services/connectivity_service.dart"; cat > "${B}/lib/core/services/connectivity_service.dart" << EOF
+_yes "$F_CONNECTIVITY" && _dart "lib/core/services/connectivity_service.dart"; cat > "${B}/lib/core/services/connectivity_service.dart" << EOF
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 
@@ -4626,8 +4625,163 @@ EOF
     _dart "lib/routes/guards/role_guard.dart"
   fi
 
-  _dart "lib/app.dart"
-  _dart "lib/main.dart"
+# ── app.dart ────────────────────────────────────────────
+_dart "lib/app.dart"; cat > "${B}/lib/app.dart" << EOF
+import 'package:flutter/material.dart';
+
+class MainApp extends StatefulWidget {
+  const MainApp({super.key});
+
+  @override
+  State<MainApp> createState() => _MainAppState();
+}
+
+class _MainAppState extends State<MainApp> {
+  @override
+  Widget build(BuildContext context) {
+    return const Text('Hello World');
+  }
+}
+EOF
+
+
+  # ── main.dart ────────────────────────────────────────────
+  _dart "lib/main.dart"; cat > "${B}/lib/main.dart" << EOF
+import 'dart:async';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:get/get.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:${PROJECT_NAME}/app.dart';
+import 'package:${PROJECT_NAME}/core/services/service.dart';
+import 'package:${PROJECT_NAME}/core/theme/app_theme.dart';
+import 'package:${PROJECT_NAME}/core/utils/helpers/theme_helper.dart';
+
+// Global navigator key for accessing context from anywhere
+class MyNavigatorKey {
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
+}
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Automatic according to the theme
+  final brightness =
+      WidgetsBinding.instance.platformDispatcher.platformBrightness;
+
+  SystemChrome.setSystemUIOverlayStyle(
+    // AppColorScheme.overlayStyle(Brightness.light),
+    AppColorScheme.overlayStyle(brightness),
+  );
+
+  // Pre-initialize AdService before UI loads (non-blocking)
+  // This avoids initializing on every screen
+  unawaited(AdService.instance.initialize(showProbability: 0.3));
+
+  // Initialize connectivity service (non-blocking)
+  unawaited(ConnectivityService().initialize());
+
+  // Set preferred orientations (portrait only)
+  SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+
+  // Google Admob
+  MobileAds.instance.initialize();
+  await _initializeFirebaseSafely();
+
+  runApp(const MyApp());
+}
+
+Future<void> _initializeFirebaseSafely() async {
+  try {
+    await Firebase.initializeApp();
+  } catch (error) {
+    debugPrint('Firebase initialization skipped: $error');
+  }
+}
+
+class MyApp extends StatefulWidget {
+  const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      InAppReviewService.instance.checkAndRequestReview();
+    });
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+
+    // Handle app lifecycle for performance optimization
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+        // App is in background or inactive - reduce resource usage
+        break;
+      case AppLifecycleState.resumed:
+        // App is resumed - check for app updates
+        _checkForUpdates();
+        break;
+      case AppLifecycleState.detached:
+        // App is being terminated - cleanup
+        _cleanup();
+        break;
+      case AppLifecycleState.hidden:
+        // App is hidden
+        break;
+    }
+  }
+
+  // Google Play Store New Update
+  void _checkForUpdates() {
+    // Use post frame callback to ensure context is ready
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final BuildContext? context = MyNavigatorKey.navigatorKey.currentContext;
+      if (context != null) {
+        UpdateService().checkForUpdate(context);
+      }
+    });
+  }
+
+  void _cleanup() {
+    // Dispose services when app terminates
+    AdService.instance.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GetMaterialApp(
+      navigatorKey: MyNavigatorKey.navigatorKey,
+      title: 'MyApp',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: ThemeMode.system,
+      home: const MainApp(),
+    );
+  }
+}
+EOF
+
 
   if _yes "$F_UNIT_TEST"; then
     _dart "test/unit/features/auth/auth_usecase_test.dart"
@@ -4887,20 +5041,6 @@ MAKEOF
   if _yes "$F_FLAVORS"; then
     cat >> "${B}/Makefile" << 'EOF'
 
-run-dev:
-	flutter run --flavor dev --target lib/main_dev.dart
-
-run-staging:
-	flutter run --flavor staging --target lib/main_staging.dart
-
-run-prod:
-	flutter run --flavor prod --target lib/main_prod.dart
-
-build-dev:
-	flutter build apk --flavor dev --target lib/main_dev.dart
-
-build-prod:
-	flutter build apk --flavor prod --target lib/main_prod.dart --release
 EOF
   fi
 
