@@ -1559,8 +1559,551 @@ class AppColorScheme {
 }
 EOF
 
-  _dart "lib/core/constants/enums/status.dart"
-  _dart "lib/core/constants/enums/app_enum.dart"
+
+# ── 1. THEME ENUM ────────────────────────────────────────────
+_dart "lib/core/constants/enums/app_theme_mode.dart"; cat > "${B}/lib/core/constants/enums/app_theme_mode.dart" << EOF
+enum AppThemeMode {
+  light,
+  dark,
+  system;
+
+  bool get isLight  => this == AppThemeMode.light;
+  bool get isDark   => this == AppThemeMode.dark;
+  bool get isSystem => this == AppThemeMode.system;
+
+  String get label => switch (this) {
+    AppThemeMode.light  => 'Light',
+    AppThemeMode.dark   => 'Dark',
+    AppThemeMode.system => 'System',
+  };
+}
+EOF
+
+# ── 2. AUTH ENUMS ────────────────────────────────────────────
+_dart "lib/core/constants/enums/auth_status.dart"; cat > "${B}/lib/core/constants/enums/auth_status.dart" << EOF
+enum AuthStatus {
+  initial,
+  authenticated,
+  unauthenticated,
+  loading,
+  error;
+
+  bool get isAuthenticated   => this == AuthStatus.authenticated;
+  bool get isUnauthenticated => this == AuthStatus.unauthenticated;
+  bool get isLoading         => this == AuthStatus.loading;
+  bool get isError           => this == AuthStatus.error;
+}
+EOF
+
+_dart "lib/core/constants/enums/auth_provider.dart"; cat > "${B}/lib/core/constants/enums/auth_provider.dart" << EOF
+enum AuthProvider {
+  email,
+  google,
+  apple,
+  phone,
+  guest;
+
+  String get label => switch (this) {
+    AuthProvider.email  => 'Email',
+    AuthProvider.google => 'Google',
+    AuthProvider.apple  => 'Apple',
+    AuthProvider.phone  => 'Phone',
+    AuthProvider.guest  => 'Guest',
+  };
+
+  bool get isSocial => this == AuthProvider.google || this == AuthProvider.apple;
+  bool get isGuest  => this == AuthProvider.guest;
+}
+EOF
+
+_dart "lib/core/constants/enums/otp_type.dart"; cat > "${B}/lib/core/constants/enums/otp_type.dart" << EOF
+enum OtpType {
+  emailVerification,
+  phoneVerification,
+  passwordReset,
+  twoFactor;
+}
+EOF
+
+# ── 3. USER ENUMS ────────────────────────────────────────────
+_dart "lib/core/constants/enums/user_role.dart"; cat > "${B}/lib/core/constants/enums/user_role.dart" << EOF
+enum UserRole {
+  guest,
+  free,
+  pro,
+  admin;
+
+  bool get isPro   => this == UserRole.pro || this == UserRole.admin;
+  bool get isAdmin => this == UserRole.admin;
+  bool get isGuest => this == UserRole.guest;
+  bool get isFree  => this == UserRole.free;
+
+  String get label => switch (this) {
+    UserRole.guest => 'Guest',
+    UserRole.free  => 'Free',
+    UserRole.pro   => 'Pro',
+    UserRole.admin => 'Admin',
+  };
+}
+EOF
+
+_dart "lib/core/constants/enums/user_status.dart"; cat > "${B}/lib/core/constants/enums/user_status.dart" << EOF
+enum UserStatus {
+  active,
+  inactive,
+  banned,
+  pendingVerification;
+
+  bool get isActive   => this == UserStatus.active;
+  bool get isBanned   => this == UserStatus.banned;
+  bool get isPending  => this == UserStatus.pendingVerification;
+  bool get isInactive => this == UserStatus.inactive;
+}
+EOF
+
+_dart "lib/core/constants/enums/gender.dart"; cat > "${B}/lib/core/constants/enums/gender.dart" << EOF
+enum Gender {
+  male,
+  female,
+  other,
+  preferNotToSay;
+
+  String get label => switch (this) {
+    Gender.male           => 'Male',
+    Gender.female         => 'Female',
+    Gender.other          => 'Other',
+    Gender.preferNotToSay => 'Prefer not to say',
+  };
+}
+EOF
+
+# ── 4. API / NETWORK ENUMS ───────────────────────────────────
+_dart "lib/core/constants/enums/api_status.dart"; cat > "${B}/lib/core/constants/enums/api_status.dart" << EOF
+enum ApiStatus {
+  initial,
+  loading,
+  success,
+  failure,
+  empty;
+
+  bool get isInitial => this == ApiStatus.initial;
+  bool get isLoading => this == ApiStatus.loading;
+  bool get isSuccess => this == ApiStatus.success;
+  bool get isFailure => this == ApiStatus.failure;
+  bool get isEmpty   => this == ApiStatus.empty;
+  bool get isDone    => isSuccess || isFailure;
+}
+EOF
+
+_dart "lib/core/constants/enums/network_status.dart"; cat > "${B}/lib/core/constants/enums/network_status.dart" << EOF
+enum NetworkStatus {
+  online,
+  offline,
+  limited;
+
+  bool get isOnline  => this == NetworkStatus.online;
+  bool get isOffline => this == NetworkStatus.offline;
+  bool get isLimited => this == NetworkStatus.limited;
+}
+EOF
+
+_dart "lib/core/constants/enums/http_method.dart"; cat > "${B}/lib/core/constants/enums/http_method.dart" << EOF
+enum HttpMethod {
+  get,
+  post,
+  put,
+  patch,
+  delete;
+
+  String get value => name.toUpperCase();
+}
+EOF
+
+_dart "lib/core/constants/enums/api_error_type.dart"; cat > "${B}/lib/core/constants/enums/api_error_type.dart" << EOF
+enum ApiErrorType {
+  network,
+  timeout,
+  unauthorized,
+  forbidden,
+  notFound,
+  validation,
+  server,
+  unknown;
+
+  bool get isUnauthorized => this == ApiErrorType.unauthorized;
+  bool get isNetwork      => this == ApiErrorType.network;
+  bool get isServer       => this == ApiErrorType.server;
+}
+EOF
+
+# ── 5. FILE ENUMS ────────────────────────────────────────────
+_dart "lib/core/constants/enums/file_type.dart"; cat > "${B}/lib/core/constants/enums/file_type.dart" << EOF
+enum FileType {
+  pdf,
+  docx,
+  doc,
+  txt,
+  image,
+  video,
+  audio,
+  other;
+
+  String get extension => switch (this) {
+    FileType.pdf   => 'pdf',
+    FileType.docx  => 'docx',
+    FileType.doc   => 'doc',
+    FileType.txt   => 'txt',
+    FileType.image => 'png',
+    FileType.video => 'mp4',
+    FileType.audio => 'mp3',
+    FileType.other => '',
+  };
+
+  bool get isDocument => this == FileType.pdf  ||
+                         this == FileType.docx ||
+                         this == FileType.doc  ||
+                         this == FileType.txt;
+
+  bool get isMedia    => this == FileType.image ||
+                         this == FileType.video ||
+                         this == FileType.audio;
+}
+EOF
+
+_dart "lib/core/constants/enums/sort_order.dart"; cat > "${B}/lib/core/constants/enums/sort_order.dart" << EOF
+enum SortOrder {
+  nameAsc,
+  nameDesc,
+  dateAsc,
+  dateDesc,
+  sizeAsc,
+  sizeDesc;
+
+  String get label => switch (this) {
+    SortOrder.nameAsc  => 'Name (A–Z)',
+    SortOrder.nameDesc => 'Name (Z–A)',
+    SortOrder.dateAsc  => 'Oldest first',
+    SortOrder.dateDesc => 'Newest first',
+    SortOrder.sizeAsc  => 'Smallest first',
+    SortOrder.sizeDesc => 'Largest first',
+  };
+}
+EOF
+
+_dart "lib/core/constants/enums/view_mode.dart"; cat > "${B}/lib/core/constants/enums/view_mode.dart" << EOF
+enum ViewMode {
+  grid,
+  list;
+
+  bool get isGrid => this == ViewMode.grid;
+  bool get isList => this == ViewMode.list;
+}
+EOF
+
+# ── 6. UPLOAD / DOWNLOAD ENUMS ───────────────────────────────
+_dart "lib/core/constants/enums/upload_status.dart"; cat > "${B}/lib/core/constants/enums/upload_status.dart" << EOF
+enum UploadStatus {
+  idle,
+  picking,
+  uploading,
+  processing,
+  completed,
+  failed,
+  cancelled;
+
+  bool get isActive    => this == UploadStatus.uploading ||
+                          this == UploadStatus.processing;
+  bool get isCompleted => this == UploadStatus.completed;
+  bool get isFailed    => this == UploadStatus.failed;
+  bool get isIdle      => this == UploadStatus.idle;
+}
+EOF
+
+_dart "lib/core/constants/enums/download_status.dart"; cat > "${B}/lib/core/constants/enums/download_status.dart" << EOF
+enum DownloadStatus {
+  idle,
+  downloading,
+  completed,
+  failed,
+  cancelled;
+
+  bool get isActive    => this == DownloadStatus.downloading;
+  bool get isCompleted => this == DownloadStatus.completed;
+  bool get isFailed    => this == DownloadStatus.failed;
+}
+EOF
+
+# ── 7. NOTIFICATION ENUMS ────────────────────────────────────
+_dart "lib/core/constants/enums/notification_type.dart"; cat > "${B}/lib/core/constants/enums/notification_type.dart" << EOF
+enum NotificationType {
+  general,
+  upload,
+  download,
+  payment,
+  security,
+  update,
+  promotion,
+  reminder;
+
+  String get label => switch (this) {
+    NotificationType.general   => 'General',
+    NotificationType.upload    => 'Upload',
+    NotificationType.download  => 'Download',
+    NotificationType.payment   => 'Payment',
+    NotificationType.security  => 'Security',
+    NotificationType.update    => 'Update',
+    NotificationType.promotion => 'Promotion',
+    NotificationType.reminder  => 'Reminder',
+  };
+}
+EOF
+
+_dart "lib/core/constants/enums/notification_priority.dart"; cat > "${B}/lib/core/constants/enums/notification_priority.dart" << EOF
+enum NotificationPriority {
+  low,
+  normal,
+  high,
+  urgent;
+
+  bool get isUrgent => this == NotificationPriority.urgent;
+  bool get isHigh   => this == NotificationPriority.high;
+}
+EOF
+
+# ── 8. SUBSCRIPTION / PAYMENT ENUMS ─────────────────────────
+_dart "lib/core/constants/enums/subscription_plan.dart"; cat > "${B}/lib/core/constants/enums/subscription_plan.dart" << EOF
+enum SubscriptionPlan {
+  free,
+  monthly,
+  yearly,
+  lifetime;
+
+  bool get isPaid => this != SubscriptionPlan.free;
+  bool get isFree => this == SubscriptionPlan.free;
+
+  String get label => switch (this) {
+    SubscriptionPlan.free     => 'Free',
+    SubscriptionPlan.monthly  => 'Monthly',
+    SubscriptionPlan.yearly   => 'Yearly',
+    SubscriptionPlan.lifetime => 'Lifetime',
+  };
+}
+EOF
+
+_dart "lib/core/constants/enums/payment_status.dart"; cat > "${B}/lib/core/constants/enums/payment_status.dart" << EOF
+enum PaymentStatus {
+  pending,
+  processing,
+  completed,
+  failed,
+  refunded,
+  cancelled;
+
+  bool get isCompleted  => this == PaymentStatus.completed;
+  bool get isFailed     => this == PaymentStatus.failed;
+  bool get isPending    => this == PaymentStatus.pending;
+  bool get isRefunded   => this == PaymentStatus.refunded;
+}
+EOF
+
+_dart "lib/core/constants/enums/payment_method.dart"; cat > "${B}/lib/core/constants/enums/payment_method.dart" << EOF
+enum PaymentMethod {
+  card,
+  upi,
+  netBanking,
+  wallet,
+  cod;
+
+  String get label => switch (this) {
+    PaymentMethod.card       => 'Credit / Debit Card',
+    PaymentMethod.upi        => 'UPI',
+    PaymentMethod.netBanking => 'Net Banking',
+    PaymentMethod.wallet     => 'Wallet',
+    PaymentMethod.cod        => 'Cash on Delivery',
+  };
+}
+EOF
+
+# ── 9. UI STATE ENUMS ────────────────────────────────────────
+_dart "lib/core/constants/enums/page_state.dart"; cat > "${B}/lib/core/constants/enums/page_state.dart" << EOF
+enum PageState {
+  initial,
+  loading,
+  loaded,
+  empty,
+  error,
+  loadingMore;
+
+  bool get isInitial    => this == PageState.initial;
+  bool get isLoading    => this == PageState.loading;
+  bool get isLoaded     => this == PageState.loaded;
+  bool get isEmpty      => this == PageState.empty;
+  bool get isError      => this == PageState.error;
+  bool get isLoadingMore => this == PageState.loadingMore;
+  bool get showContent  => isLoaded || isLoadingMore;
+}
+EOF
+
+_dart "lib/core/constants/enums/snackbar_type.dart"; cat > "${B}/lib/core/constants/enums/snackbar_type.dart" << EOF
+enum SnackbarType {
+  success,
+  error,
+  warning,
+  info;
+
+  bool get isSuccess => this == SnackbarType.success;
+  bool get isError   => this == SnackbarType.error;
+}
+EOF
+
+_dart "lib/core/constants/enums/dialog_type.dart"; cat > "${B}/lib/core/constants/enums/dialog_type.dart" << EOF
+enum DialogType {
+  info,
+  success,
+  warning,
+  error,
+  confirm,
+  custom;
+
+  bool get isConfirm => this == DialogType.confirm;
+  bool get isError   => this == DialogType.error;
+}
+EOF
+
+_dart "lib/core/constants/enums/button_state.dart"; cat > "${B}/lib/core/constants/enums/button_state.dart" << EOF
+enum ButtonState {
+  idle,
+  loading,
+  success,
+  error,
+  disabled;
+
+  bool get isLoading  => this == ButtonState.loading;
+  bool get isDisabled => this == ButtonState.disabled;
+  bool get isSuccess  => this == ButtonState.success;
+  bool get isIdle     => this == ButtonState.idle;
+}
+EOF
+
+# ── 10. LOCALE ENUM ──────────────────────────────────────────
+_dart "lib/core/constants/enums/app_locale.dart"; cat > "${B}/lib/core/constants/enums/app_locale.dart" << EOF
+enum AppLocale {
+  en,
+  hi,
+  ar,
+  fr,
+  es,
+  de,
+  zh;
+
+  String get code => name;
+
+  String get label => switch (this) {
+    AppLocale.en => 'English',
+    AppLocale.hi => 'हिन्दी',
+    AppLocale.ar => 'العربية',
+    AppLocale.fr => 'Français',
+    AppLocale.es => 'Español',
+    AppLocale.de => 'Deutsch',
+    AppLocale.zh => '中文',
+  };
+
+  bool get isRtl => this == AppLocale.ar;
+}
+EOF
+
+# ── 11. PERMISSION ENUMS ─────────────────────────────────────
+_dart "lib/core/constants/enums/app_permission.dart"; cat > "${B}/lib/core/constants/enums/app_permission.dart" << EOF
+enum AppPermission {
+  camera,
+  gallery,
+  storage,
+  microphone,
+  location,
+  notification,
+  contacts,
+  biometric;
+
+  String get label => switch (this) {
+    AppPermission.camera       => 'Camera',
+    AppPermission.gallery      => 'Gallery',
+    AppPermission.storage      => 'Storage',
+    AppPermission.microphone   => 'Microphone',
+    AppPermission.location     => 'Location',
+    AppPermission.notification => 'Notification',
+    AppPermission.contacts     => 'Contacts',
+    AppPermission.biometric    => 'Biometric',
+  };
+}
+EOF
+
+_dart "lib/core/constants/enums/permission_status.dart"; cat > "${B}/lib/core/constants/enums/permission_status.dart" << EOF
+enum PermissionStatus {
+  granted,
+  denied,
+  permanentlyDenied,
+  restricted;
+
+  bool get isGranted           => this == PermissionStatus.granted;
+  bool get isDenied            => this == PermissionStatus.denied;
+  bool get isPermanentlyDenied => this == PermissionStatus.permanentlyDenied;
+  bool get needsRequest        => this == PermissionStatus.denied;
+  bool get needsSettings       => this == PermissionStatus.permanentlyDenied;
+}
+EOF
+
+# ── 12. ENVIRONMENT ENUM ─────────────────────────────────────
+_dart "lib/core/constants/enums/app_environment.dart"; cat > "${B}/lib/core/constants/enums/app_environment.dart" << EOF
+enum AppEnvironment {
+  dev,
+  staging,
+  prod;
+
+  bool get isDev     => this == AppEnvironment.dev;
+  bool get isStaging => this == AppEnvironment.staging;
+  bool get isProd    => this == AppEnvironment.prod;
+
+  String get label => switch (this) {
+    AppEnvironment.dev     => 'Development',
+    AppEnvironment.staging => 'Staging',
+    AppEnvironment.prod    => 'Production',
+  };
+}
+EOF
+
+# ── BARREL EXPORT ────────────────────────────────────────────
+_dart "lib/core/constants/enums/app_enums.dart"; cat > "${B}/lib/core/constants/enums/app_enums.dart" << EOF
+// ── Barrel export – sirf yeh ek import poore app mein ──
+export 'app_theme_mode.dart';
+export 'auth_status.dart';
+export 'auth_provider.dart';
+export 'otp_type.dart';
+export 'user_role.dart';
+export 'user_status.dart';
+export 'gender.dart';
+export 'api_status.dart';
+export 'network_status.dart';
+export 'http_method.dart';
+export 'api_error_type.dart';
+export 'file_type.dart';
+export 'sort_order.dart';
+export 'view_mode.dart';
+export 'upload_status.dart';
+export 'download_status.dart';
+export 'notification_type.dart';
+export 'notification_priority.dart';
+export 'subscription_plan.dart';
+export 'payment_status.dart';
+export 'payment_method.dart';
+export 'page_state.dart';
+export 'snackbar_type.dart';
+export 'dialog_type.dart';
+export 'button_state.dart';
+export 'app_locale.dart';
+export 'app_permission.dart';
+export 'permission_status.dart';
+export 'app_environment.dart';
+EOF
 
   _dart "lib/core/errors/exceptions.dart"
 
