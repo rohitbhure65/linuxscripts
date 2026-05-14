@@ -80,7 +80,7 @@ alias ...='cd ../..'
 alias ....='cd ../../..'
 alias home='cd ~'
 alias reload='source ~/.bashrc'
-alias cat='cat -n'
+# alias cat='cat -n'
 
 #####################################
 # APT / SYSTEM MANAGEMENT

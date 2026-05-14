@@ -751,21 +751,650 @@ mkflutter() {
   done
   _yes "$F_L10N" && touch "${B}/assets/translations/.gitkeep"
 
-  _dart "lib/core/constants/app_constants.dart";cat > "${B}/lib/core/constants/app_constants.dart" << EOF
+  _dart "lib/core/constants/app_features.dart"; cat > "${B}/lib/core/constants/app_features.dart" << EOF
+// ── FEATURE FLAGS ────────────────────────────────────────────
+abstract final class AppFeatures {
+
+  // — UI / Theming —
+  static const bool enableDarkMode          = true;
+  static const bool enableSystemTheme       = true;
+  static const bool enableCustomFonts       = true;
+  static const bool enableAnimations        = true;
+  static const bool enableHaptics           = true;
+  static const bool enableSplashScreen      = true;
+  static const bool showDebugBanner         = false;
+  static const bool showPerformanceOverlay  = false;
+
+  // — Auth —
+  static const bool enableGoogleSignIn     = true;
+  static const bool enableAppleSignIn      = true;
+  static const bool enableEmailAuth        = true;
+  static const bool enableGuestMode        = false;
+  static const bool enableBiometricLock    = true;
+  static const bool enableAutoLogout       = true;
+
+  // — Notifications —
+  static const bool enableNotifications      = true;
+  static const bool enablePushNotifications  = true;
+  static const bool enableLocalNotifications = true;
+  static const bool enableEmailNotifications = false;
+  static const bool enableInAppBanner        = true;
+  static const bool enableNotificationBadge  = true;
+
+  // — AI / Smart Features —
+  static const bool enableAiSummary        = false;
+  static const bool enableAiChat           = false;
+  static const bool enableSmartSearch      = false;
+  static const bool enableAutoTagging      = false;
+  static const bool enableAiTranslation    = false;
+
+  // — Storage / Sync —
+  static const bool enableOfflineMode      = true;
+  static const bool enableCloudSync        = false;
+  static const bool enableGoogleDrive      = false;
+  static const bool enableDropbox          = false;
+  static const bool enableOneDrive         = false;
+  static const bool enableAutoBackup       = false;
+  static const bool enableLocalStorage     = true;
+
+  // — Sharing & Export —
+  static const bool enableShareSheet       = true;
+  static const bool enableQrShare          = false;
+  static const bool enableLinkShare        = false;
+  static const bool enablePrint            = true;
+  static const bool enableExportCsv        = false;
+  static const bool enableExportExcel      = false;
+
+  // — Analytics & Monitoring —
+  static const bool enableAnalytics          = true;
+  static const bool enableCrashReporting     = true;
+  static const bool enablePerformanceMonitor = false;
+  static const bool enableUserTracking       = false;
+  static const bool enableHeatmaps           = false;
+  static const bool enableABTesting          = false;
+
+  // — Monetization —
+  static const bool enableSubscription     = true;
+  static const bool enableInAppPurchase    = true;
+  static const bool enableFreeTier         = true;
+  static const bool enableAds              = false;
+  static const bool enableReferralProgram  = false;
+  static const bool enablePromoCode        = false;
+
+  // — Developer / QA —
+  static const bool enableLogging          = false;
+  static const bool enableNetworkLogger    = false;
+  static const bool enableMockApi          = false;
+  static const bool enableShakeToReport    = false;
+  static const bool enableInspector        = false;
+
+  // ── Computed helpers ──
+  static bool get isAiEnabled    => enableAiSummary || enableAiChat;
+  static bool get isCloudEnabled => enableCloudSync || enableGoogleDrive
+                                  || enableDropbox  || enableOneDrive;
+  static bool get isMonetized    => enableSubscription || enableInAppPurchase
+                                  || enableAds;
+}
+EOF
+
+  _dart "lib/core/constants/app_assets.dart"; cat > "${B}/lib/core/constants/app_assets.dart" << 'EOF'
+  // ── 7. ASSETS ────────────────────────────────────────────────
+abstract final class AppAssets {
+  // — Base Paths —
+  // ignore: unused_field
+  static const String _fonts = 'assets/fonts';
+  static const String _images = 'assets/images';
+  static const String _icons = 'assets/images/icons';
+  static const String _logo = 'assets/images/logo';
+  static const String _placeholder = 'assets/images/placeholders';
+  static const String _anim = 'assets/animations';
+  static const String _audio = 'assets/audio';
+  static const String _json = 'assets/json';
+  static const String _translations = 'assets/translations';
+  static const String _video = 'assets/video';
+
+  // ── IMAGES ───────────────────────────────────────────────
+
+  // Logo variants
+  static const String logo = '$_logo/logo.png';
+
+  // Onboarding
+  static const String onboarding1 = '$_images/onboarding_1.png';
+
+  // Placeholders
+  static const String placeholderUser = '$_placeholder/ph_user.png';
+
+  // Empty / Error States
+  static const String emptyGeneral = '$_images/empty_general.png';
+
+  // Illustrations
+  static const String illSuccess = '$_images/ill_success.png';
+
+  // ── ICONS (SVG) ──────────────────────────────────────────
+
+  // Navigation
+  static const String icHome = '$_icons/ic_home.svg';
+
+  // Actions
+  static const String icUpload = '$_icons/ic_upload.svg';
+
+  // File Types
+  static const String icPdf = '$_icons/ic_pdf.svg';
+
+  // Status
+  static const String icSuccess = '$_icons/ic_success.svg';
+
+  // Auth / Social
+  static const String icGoogle = '$_icons/ic_google.svg';
+
+  // Premium
+  static const String icCrown = '$_icons/ic_crown.svg';
+
+  // ── ANIMATIONS (Lottie JSON) ─────────────────────────────
+
+  static const String animLoading = '$_anim/loading.json';
+
+  // ── AUDIO ────────────────────────────────────────────────
+
+  static const String sfxSuccess = '$_audio/sfx_success.mp3';
+
+  // ── JSON (Local Data) ────────────────────────────────────
+
+  static const String jsonCountries = '$_json/countries.json';
+
+  // ── TRANSLATIONS ─────────────────────────────────────────
+
+  static const String transEn = '$_translations/en.json';
+
+  // ── VIDEO ────────────────────────────────────────────────
+
+  static const String videoIntro = '$_video/intro.mp4';
+
+  // ── FONTS ────────────────────────────────────────────────
+  // (pubspec.yaml mein register karo — yahan reference ke liye)
+  static const String fontInter = 'Inter';
+  static const String fontInterMedium = 'Inter-Medium';
+  static const String fontInterSemiBold = 'Inter-SemiBold';
+  static const String fontInterBold = 'Inter-Bold';
+  static const String fontJetBrainsMono = 'JetBrainsMono';
+}
+EOF
+
+  _dart "lib/core/constants/app_duration.dart"; cat > "${B}/lib/core/constants/app_duration.dart" << EOF
+// ── DURATIONS (timeouts / debounce) ──────────────────────
+abstract final class AppDurations {
+  static const Duration searchDebounce     = Duration(milliseconds: 400);
+  static const Duration inputDebounce      = Duration(milliseconds: 300);
+  static const Duration buttonThrottle     = Duration(milliseconds: 500);
+  static const Duration sessionTimeout     = Duration(minutes: 30);
+  static const Duration tokenRefreshBuffer = Duration(minutes: 5);
+  static const Duration otpExpiry          = Duration(minutes: 10);
+  static const Duration splashDelay        = Duration(seconds: 2);
+  static const Duration toastDuration      = Duration(seconds: 3);
+  static const Duration longPressDelay     = Duration(milliseconds: 400);
+  static const Duration doubleTapWindow    = Duration(milliseconds: 300);
+  static const Duration autoScrollDelay    = Duration(milliseconds: 100);
+}
+EOF
+
+  _dart "lib/core/constants/app_pagination.dart"; cat > "${B}/lib/core/constants/app_pagination.dart" << EOF
+// ── PAGINATION ───────────────────────────────────────────
+abstract final class AppPagination {
+  static const int defaultPageSize  = 20;
+  static const int smallPageSize    = 10;
+  static const int largePageSize    = 50;
+  static const int firstPage        = 1;
+  static const int scrollThreshold  = 200;
+  static const int maxOfflineItems  = 100;
+}
+EOF
+
+  _dart "lib/core/constants/app_layout.dart"; cat > "${B}/lib/core/constants/app_layout.dart" << EOF
+// ── UI / LAYOUT ───────────────────────────────────────────
 import 'package:flutter/material.dart';
 
+abstract final class AppLayout {
+
+  // — Spacing Scale (8-pt grid) —
+  static const double spaceXxs = 2.0;
+  static const double spaceXs  = 4.0;
+  static const double spaceSm  = 8.0;
+  static const double spaceMd  = 16.0;
+  static const double spaceLg  = 24.0;
+  static const double spaceXl  = 32.0;
+  static const double spaceXxl = 48.0;
+  static const double space64  = 64.0;
+  static const double space80  = 80.0;
+  static const double space96  = 96.0;
+
+  // — Insets / Padding (screen-level) —
+  static const double screenPaddingH    = 20.0;
+  static const double screenPaddingV    = 24.0;
+  static const double contentPaddingH   = 16.0;
+  static const double contentPaddingV   = 12.0;
+  static const double cardPaddingH      = 16.0;
+  static const double cardPaddingV      = 14.0;
+  static const double listItemPaddingH  = 16.0;
+  static const double listItemPaddingV  = 12.0;
+  static const double sectionSpacing    = 32.0;
+  static const double groupSpacing      = 16.0;
+
+  // — Border Radius —
+  static const double radiusXs   = 4.0;
+  static const double radiusSm   = 6.0;
+  static const double radiusMd   = 10.0;
+  static const double radiusLg   = 16.0;
+  static const double radiusXl   = 24.0;
+  static const double radiusXxl  = 32.0;
+  static const double radiusFull = 999.0;
+
+  // — Elevation —
+  static const double elevationNone = 0.0;
+  static const double elevationXs   = 0.5;
+  static const double elevationSm   = 1.0;
+  static const double elevationMd   = 4.0;
+  static const double elevationLg   = 8.0;
+  static const double elevationXl   = 16.0;
+
+  // — Border / Stroke —
+  static const double borderThin     = 0.5;
+  static const double borderNormal   = 1.0;
+  static const double borderMedium   = 1.5;
+  static const double borderThick    = 2.0;
+  static const double dividerThickness = 0.5;
+
+  // — Opacity —
+  static const double opacityDisabled  = 0.38;
+  static const double opacityHint      = 0.54;
+  static const double opacitySubtle    = 0.70;
+  static const double opacityOverlay   = 0.60;
+  static const double opacityFull      = 1.00;
+
+  // — App Bars —
+  static const double appBarHeight         = 56.0;
+  static const double appBarHeightLg       = 64.0;
+  static const double appBarElevation      = 0.0;
+  static const double appBarIconSize       = 24.0;
+  static const double appBarTitleSpacing   = 16.0;
+
+  // — Bottom Navigation —
+  static const double bottomNavHeight      = 64.0;
+  static const double bottomNavIconSize    = 24.0;
+  static const double bottomNavLabelSize   = 11.0;
+  static const double bottomNavElevation   = 8.0;
+
+  // — Buttons —
+  static const double buttonHeight         = 52.0;
+  static const double buttonHeightSm       = 38.0;
+  static const double buttonHeightXs       = 30.0;
+  static const double buttonMinWidth       = 120.0;
+  static const double buttonPaddingH       = 24.0;
+  static const double buttonPaddingV       = 14.0;
+  static const double buttonBorderWidth    = 1.5;
+  static const double buttonIconSize       = 18.0;
+  static const double buttonIconGap        = 8.0;
+
+  // — Input Fields —
+  static const double inputHeight          = 52.0;
+  static const double inputHeightSm        = 44.0;
+  static const double inputPaddingH        = 16.0;
+  static const double inputPaddingV        = 14.0;
+  static const double inputBorderWidth     = 1.0;
+  static const double inputBorderFocused   = 1.5;
+  static const double inputLabelSize       = 13.0;
+  static const double inputHintSize        = 15.0;
+  static const double inputHelperSize      = 12.0;
+  static const double inputPrefixIconSize  = 20.0;
+
+  // — Cards —
+  static const double cardElevation        = 0.0;
+  static const double cardBorderWidth      = 1.0;
+  static const double cardMinHeight        = 72.0;
+
+  // — List Items —
+  static const double listItemHeight       = 64.0;
+  static const double listItemHeightSm     = 48.0;
+  static const double listItemHeightLg     = 80.0;
+  static const double listTileLeadingSize  = 40.0;
+
+  // — Chips / Badges —
+  static const double chipHeight           = 32.0;
+  static const double chipHeightSm         = 24.0;
+  static const double chipPaddingH         = 12.0;
+  static const double chipIconSize         = 16.0;
+  static const double badgeSize            = 18.0;
+  static const double badgeSizeSm          = 8.0;
+  static const double badgePaddingH        = 6.0;
+
+  // — Dialogs / Sheets —
+  static const double dialogWidth          = 320.0;
+  static const double dialogMaxWidth       = 480.0;
+  static const double dialogPaddingH       = 24.0;
+  static const double dialogPaddingV       = 20.0;
+  static const double dialogBorderRadius   = radiusXl;
+  static const double bottomSheetRadius    = radiusXl;
+  static const double bottomSheetHandleW   = 40.0;
+  static const double bottomSheetHandleH   = 4.0;
+  static const double modalMaxHeightRatio  = 0.92;
+
+  // — FAB —
+  static const double fabSize              = 56.0;
+  static const double fabSizeSm           = 40.0;
+  static const double fabIconSize          = 24.0;
+  static const double fabMarginB           = 16.0;
+  static const double fabMarginR           = 16.0;
+
+  // — Avatars —
+  static const double avatarSizeXs = 24.0;
+  static const double avatarSizeSm = 32.0;
+  static const double avatarSizeMd = 44.0;
+  static const double avatarSizeLg = 64.0;
+  static const double avatarSizeXl = 96.0;
+
+  // — Icons —
+  static const double iconSizeXs   = 12.0;
+  static const double iconSizeSm   = 16.0;
+  static const double iconSizeMd   = 24.0;
+  static const double iconSizeLg   = 32.0;
+  static const double iconSizeXl   = 48.0;
+
+  // — Images / Thumbnails —
+  static const double thumbSizeSm  = 48.0;
+  static const double thumbSizeMd  = 80.0;
+  static const double thumbSizeLg  = 120.0;
+  static const double thumbSizeXl  = 200.0;
+
+  // — Drawer / Sidebar —
+  static const double drawerWidth      = 280.0;
+  static const double drawerWidthLg    = 320.0;
+  static const double drawerHeaderH    = 160.0;
+
+  // — Snackbar / Toast —
+  static const double snackbarMaxWidth = 480.0;
+  static const double snackbarPaddingH = 16.0;
+  static const double snackbarPaddingV = 12.0;
+  static const double snackbarRadius   = radiusMd;
+
+  // — Skeleton / Shimmer —
+  static const double skeletonRadiusSm = radiusSm;
+  static const double skeletonRadiusMd = radiusMd;
+  static const double skeletonLineH    = 14.0;
+  static const double skeletonLineHSm  = 10.0;
+
+  // — Responsive Breakpoints —
+  static const double breakpointMobile  = 480.0;
+  static const double breakpointTablet  = 768.0;
+  static const double breakpointDesktop = 1024.0;
+  static const double breakpointWide    = 1280.0;
+
+  // — Computed Helpers —
+  static EdgeInsets get screenPadding => const EdgeInsets.symmetric(
+    horizontal: screenPaddingH,
+    vertical: screenPaddingV,
+  );
+  static EdgeInsets get cardPadding => const EdgeInsets.symmetric(
+    horizontal: cardPaddingH,
+    vertical: cardPaddingV,
+  );
+  static EdgeInsets get listItemPadding => const EdgeInsets.symmetric(
+    horizontal: listItemPaddingH,
+    vertical: listItemPaddingV,
+  );
+  static BorderRadius get cardRadius  => BorderRadius.circular(radiusLg);
+  static BorderRadius get buttonRadius => BorderRadius.circular(radiusMd);
+  static BorderRadius get inputRadius  => BorderRadius.circular(radiusMd);
+  static BorderRadius get chipRadius   => BorderRadius.circular(radiusFull);
+  static BorderRadius get dialogRadius => BorderRadius.circular(radiusXl);
+
+  static bool isMobile(double width)  => width < breakpointTablet;
+  static bool isTablet(double width)  => width >= breakpointTablet && width < breakpointDesktop;
+  static bool isDesktop(double width) => width >= breakpointDesktop;
+}
+EOF
+
+  _dart "lib/core/constants/app_api.dart"; cat > "${B}/lib/core/constants/app_api.dart" << EOF
+// ── API / NETWORK ─────────────────────────────────────────
+abstract final class AppApi {
+  static const String baseUrl    = 'https://api.rohit.bhure.com/v1';
+  static const String cdnUrl     = 'https://cdn.rohit.bhure.com';
+  static const String socketUrl  = 'wss://ws.rohit.bhure.com';
+
+  static const Duration connectTimeout = Duration(seconds: 15);
+  static const Duration receiveTimeout = Duration(seconds: 30);
+  static const Duration sendTimeout    = Duration(seconds: 30);
+
+  static const int maxRetries      = 3;
+  static const int retryDelayMs    = 500;
+  static const int maxPageSize     = 20;
+
+  // Headers
+  static const String headerAuth        = 'Authorization';
+  static const String headerContentType = 'Content-Type';
+  static const String headerAccept      = 'Accept';
+  static const String headerDeviceId    = 'X-Device-Id';
+  static const String headerAppVersion  = 'X-App-Version';
+  static const String headerPlatform    = 'X-Platform';
+  static const String valueJson         = 'application/json';
+  static const String valueBearer       = 'Bearer ';
+
+  // Endpoints
+  static const String endpointAuth      = '/auth';
+  static const String endpointLogin     = '/auth/login';
+  static const String endpointRegister  = '/auth/register';
+  static const String endpointLogout    = '/auth/logout';
+  static const String endpointRefresh   = '/auth/refresh';
+  static const String endpointProfile   = '/user/profile';
+  static const String endpointUpload    = '/upload';
+  static const String endpointSettings  = '/settings';
+}
+
+EOF
+
+  _dart "lib/core/constants/app_storage.dart"; cat > "${B}/lib/core/constants/app_storage.dart" << EOF
+// ── STORAGE / CACHE KEYS ───────────────────────────────────
+abstract final class AppStorage {
+  // Auth
+  static const String keyAuthToken     = 'auth_token';
+  static const String keyRefreshToken  = 'refresh_token';
+  static const String keyUserId        = 'user_id';
+  static const String keyUserEmail     = 'user_email';
+
+  // Preferences
+  static const String keyOnboarded     = 'onboarded';
+  static const String keyThemeMode     = 'theme_mode';
+  static const String keyLocale        = 'locale';
+  static const String keyFontScale     = 'font_scale';
+  static const String keyPushEnabled   = 'push_enabled';
+  static const String keyBiometric     = 'biometric_enabled';
+  static const String keyLastSyncAt    = 'last_sync_at';
+  static const String keyFirstLaunch   = 'first_launch';
+  static const String keyLastVersion   = 'last_version';
+
+  // Cache
+  static const Duration cacheTtlShort  = Duration(minutes: 5);
+  static const Duration cacheTtlMedium = Duration(hours: 1);
+  static const Duration cacheTtlLong   = Duration(days: 7);
+  static const Duration cacheTtlForever = Duration(days: 365);
+
+  // File limits
+  static const int maxFileSizeMb     = 50;
+  static const int maxFileSizeBytes  = maxFileSizeMb * 1024 * 1024;
+  static const int maxImageSizeMb    = 10;
+  static const int maxCacheSizeMb    = 200;
+  static const int maxRecentItems    = 20;
+  static const int maxSearchHistory  = 10;
+}
+
+EOF
+
+  _dart "lib/core/constants/app_typography.dart"; cat > "${B}/lib/core/constants/app_typography.dart" << EOF
+// ── TYPOGRAPHY ────────────────────────────────────────────
+import 'dart:ui';
+
+abstract final class AppTypography {
+  static const String fontFamily     = 'Inter';
+  static const String fontFamilyMono = 'JetBrainsMono';
+
+  // Font sizes
+  static const double textXs   = 11.0;
+  static const double textSm   = 13.0;
+  static const double textMd   = 15.0;
+  static const double textBase = 16.0;
+  static const double textLg   = 17.0;
+  static const double textXl   = 20.0;
+  static const double textXxl  = 24.0;
+  static const double textXxxl = 30.0;
+  static const double textD1   = 36.0;
+  static const double textD2   = 48.0;
+
+  // Font weights
+  static const FontWeight weightLight    = FontWeight.w300;
+  static const FontWeight weightRegular  = FontWeight.w400;
+  static const FontWeight weightMedium   = FontWeight.w500;
+  static const FontWeight weightSemibold = FontWeight.w600;
+  static const FontWeight weightBold     = FontWeight.w700;
+  static const FontWeight weightExtrabold= FontWeight.w800;
+
+  // Line heights
+  static const double lineHeightTight   = 1.2;
+  static const double lineHeightNormal  = 1.5;
+  static const double lineHeightRelaxed = 1.75;
+
+  // Letter spacing
+  static const double trackingTight  = -0.5;
+  static const double trackingNormal =  0.0;
+  static const double trackingWide   =  0.5;
+  static const double trackingWidest =  1.5;
+  static const double trackingCaps   =  2.0;   // ALL CAPS labels
+}
+
+EOF
+
+  _dart "lib/core/constants/app_anim.dart"; cat > "${B}/lib/core/constants/app_anim.dart" << EOF
+// ── ANIMATION ─────────────────────────────────────────────
+import 'package:flutter/material.dart';
+
+abstract final class AppAnim {
+  static const Duration fastest = Duration(milliseconds: 100);
+  static const Duration fast    = Duration(milliseconds: 200);
+  static const Duration medium  = Duration(milliseconds: 350);
+  static const Duration slow    = Duration(milliseconds: 500);
+  static const Duration slowest = Duration(milliseconds: 800);
+
+  static const Curve easeIn    = Curves.easeIn;
+  static const Curve easeOut   = Curves.easeOut;
+  static const Curve easeInOut = Curves.easeInOut;
+  static const Curve spring    = Curves.elasticOut;
+  static const Curve bounce    = Curves.bounceOut;
+  static const Curve decelerate= Curves.decelerate;
+
+  static const Duration pageTransition      = medium;
+  static const Curve    pageTransitionCurve = easeInOut;
+  static const Duration shimmer            = Duration(milliseconds: 1200);
+  static const Duration splashDelay        = Duration(seconds: 2);
+  static const Duration snackbarDuration   = Duration(seconds: 3);
+  static const Duration tooltipDelay       = Duration(milliseconds: 500);
+  static const Duration debounce           = Duration(milliseconds: 400);
+}
+EOF
+
+  _dart "lib/core/constants/app_durations.dart"; cat > "${B}/lib/core/constants/app_durations.dart" << EOF
+// ── DURATIONS (timeouts / debounce) ──────────────────────
+abstract final class AppDurations {
+  static const Duration searchDebounce    = Duration(milliseconds: 400);
+  static const Duration inputDebounce     = Duration(milliseconds: 300);
+  static const Duration buttonThrottle    = Duration(milliseconds: 500);
+  static const Duration sessionTimeout    = Duration(minutes: 30);
+  static const Duration tokenRefreshBuffer = Duration(minutes: 5);
+  static const Duration otpExpiry         = Duration(minutes: 10);
+  static const Duration splashDelay       = Duration(seconds: 2);
+  static const Duration toastDuration     = Duration(seconds: 3);
+  static const Duration longPressDelay    = Duration(milliseconds: 400);
+  static const Duration doubleTapWindow   = Duration(milliseconds: 300);
+  static const Duration autoScrollDelay   = Duration(milliseconds: 100);
+}
+EOF
+
+  _dart "lib/core/constants/app_routes.dart"; cat > "${B}/lib/core/constants/app_routes.dart" << EOF
+abstract final class AppRoutes {
+  static const String splash        = '/';
+  static const String onboarding    = '/onboarding';
+  static const String login         = '/login';
+  static const String register      = '/register';
+  static const String forgotPass    = '/forgot-password';
+  static const String resetPass     = '/reset-password';
+  static const String verifyOtp     = '/verify-otp';
+  static const String home          = '/home';
+  static const String search        = '/search';
+  static const String notifications = '/notifications';
+  static const String profile       = '/profile';
+  static const String editProfile   = '/profile/edit';
+  static const String settings      = '/settings';
+  static const String appearance    = '/settings/appearance';
+  static const String subscription  = '/subscription';
+  static const String paywall       = '/paywall';
+  static const String webview       = '/webview';
+  static const String privacyPolicy = '/privacy';
+  static const String terms         = '/terms';
+  static const String about         = '/about';
+}
+
+EOF
+
+  _dart "lib/core/constants/app_regex.dart"; cat > "${B}/lib/core/constants/app_regex.dart" << EOF
+abstract final class AppRegex {
+  static final RegExp email    = RegExp(r'^[\w.+-]+@[\w-]+\.[a-z]{2,}$', caseSensitive: false);
+  static final RegExp phone    = RegExp(r'^\+?[0-9]{7,15}$');
+  static final RegExp url      = RegExp(r'https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&/=]*)');
+  static final RegExp username = RegExp(r'^[a-zA-Z0-9_.]{3,20}$');
+  static final RegExp otp      = RegExp(r'^\d{4,6}$');
+  static final RegExp pincode  = RegExp(r'^\d{6}$');
+  static final RegExp numeric  = RegExp(r'^\d+$');
+  static final RegExp alpha    = RegExp(r'^[a-zA-Z]+$');
+  static final RegExp alphaNum = RegExp(r'^[a-zA-Z0-9]+$');
+
+  // Password: min 8 chars, 1 upper, 1 lower, 1 digit
+  static final RegExp passwordWeak   = RegExp(r'^.{6,}$');
+  static final RegExp passwordStrong = RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$');
+
+  // Helpers
+  static bool isValidEmail(String v)    => email.hasMatch(v.trim());
+  static bool isValidPhone(String v)    => phone.hasMatch(v.trim());
+  static bool isValidUrl(String v)      => url.hasMatch(v.trim());
+  static bool isValidUsername(String v) => username.hasMatch(v.trim());
+  static bool isValidOtp(String v)      => otp.hasMatch(v.trim());
+  static bool isStrongPassword(String v)=> passwordStrong.hasMatch(v);
+}
+EOF
+
+  _dart "lib/core/constants/app_constants.dart"; cat > "${B}/lib/core/constants/app_constants.dart" << EOF
+export 'app_meta.dart';
+export 'app_api.dart';
+export 'app_storage.dart';
+export 'app_layout.dart';
+export 'app_typography.dart';
+export 'app_anim.dart';
+export 'app_assets.dart';
+export 'app_routes.dart';
+export 'app_features.dart';
+export 'app_regex.dart';
+export 'app_durations.dart';
+export 'app_pagination.dart';
+EOF
+
+  _dart "lib/core/constants/app_meta.dart"; cat > "${B}/lib/core/constants/app_meta.dart" << EOF
 // ─────────────────────────────────────────────────────────────
 // APP CONSTANTS  –  Single source of truth for all app-wide
 // configuration. UI/logic code sirf yahan se values le.
 // ─────────────────────────────────────────────────────────────
 
-// ── 1. APPLICATION METADATA ──────────────────────────────────
+// ── APPLICATION METADATA ──────────────────────────────────
 abstract final class AppMeta {
   static const String name        = '${PROJECT_NAME}';
   static const String tagline     = '';
   static const String packageName = '${APP_ID}';
   static const String version     = '1.0.0';
-  # static const String semVer      = '$version+$buildNumber';
+//static const String semVer      = '$version+$buildNumber';
 
   static const String supportEmail  = '';
   static const String privacyUrl    = '';
@@ -773,8 +1402,14 @@ abstract final class AppMeta {
   static const String websiteUrl    = '';
   static const String playStoreUrl  =
       'https://play.google.com/store/apps/details?id=${APP_ID}';
-  # static const String appStoreUrl   =
-  #     'https://apps.apple.com/app/flitpdf/id000000000';
+//static const String appStoreUrl   =
+//    'https://apps.apple.com/app/flitpdf/id000000000';
+
+// ── Social links ────────────────────────────────────────────
+  static const String twitterUrl   = '';
+  static const String instagramUrl = '';
+  static const String linkedinUrl  = '';
+  static const String youtubeUrl   = '';
 }
 EOF
 
@@ -783,7 +1418,7 @@ import 'package:flutter/material.dart';
 
 // ─────────────────────────────────────────────
 // 1. RAW PALETTE  –  single source of truth
-//    Sirf yahan hex values change karo.
+//    only change hex values.
 // ─────────────────────────────────────────────
 abstract final class _Palette {
   // Red ramp
@@ -808,6 +1443,7 @@ abstract final class _Palette {
 
   // Absolute
   static const Color white = Color(0xFFFFFFFF);
+  // ignore: unused_field
   static const Color black = Color(0xFF000000);
 
   // Semantic ramp
@@ -819,8 +1455,7 @@ abstract final class _Palette {
 
 // ─────────────────────────────────────────────
 // 2. SEMANTIC TOKENS  –  context-aware aliases
-//    UI code sirf inhe use kare, _Palette ko
-//    directly kabhi nahi.
+//    UI code use this, do not use direct _Palette
 // ─────────────────────────────────────────────
 abstract final class AppColors {
   AppColors._();
@@ -847,13 +1482,13 @@ abstract final class AppColors {
   // — Text (Light) —
   static const Color textPrimary   = _Palette.slate800;
   static const Color textSecondary = _Palette.slate500;
-  static const Color textDisabled  = _Palette.slate400;   // ← new
+  static const Color textDisabled  = _Palette.slate400;
   static const Color textLight     = _Palette.white;
 
   // — Text (Dark) —
   static const Color textPrimaryDark   = _Palette.slate100;
   static const Color textSecondaryDark = _Palette.slate400;
-  static const Color textDisabledDark  = _Palette.slate500; // ← new
+  static const Color textDisabledDark  = _Palette.slate500;
 
   // — Semantic —
   static const Color success = _Palette.emerald500;
@@ -863,7 +1498,7 @@ abstract final class AppColors {
 
   // — Borders & Dividers —
   static const Color border      = _Palette.slate200;
-  static const Color borderDark  = _Palette.slate800;  // fixed: was slate700-ish
+  static const Color borderDark  = _Palette.slate800;
   static const Color divider     = _Palette.slate100;
   static const Color dividerDark = _Palette.slate800;
 
@@ -871,7 +1506,7 @@ abstract final class AppColors {
   static const Color shadow      = Color(0x0D000000); // 5 % black
   static const Color shadowDark  = Color(0x33000000); // 20 % black
   static const Color glassLight  = Color(0x1AFFFFFF); // 10 % white
-  static const Color glassDark   = Color(0x0DFFFFFF); // 5 % white  ← new
+  static const Color glassDark   = Color(0x0DFFFFFF); // 5 % white
 
   // — Grey scale (utility) —
   static const Color grey50  = _Palette.slate50;
@@ -883,8 +1518,8 @@ abstract final class AppColors {
 }
 
 // ─────────────────────────────────────────────
-// 3. THEME HELPER  –  brightness ke hisaab se
-//    sahi token return karta hai.
+// 3. THEME HELPER  –  return correct token
+//    based on current brightness (light/dark mode).
 //    Usage:  AppColorScheme.of(context).surface
 // ─────────────────────────────────────────────
 class AppColorScheme {
@@ -912,7 +1547,7 @@ class AppColorScheme {
   Color get shadow   => _isDark ? AppColors.shadowDark  : AppColors.shadow;
   Color get glass    => _isDark ? AppColors.glassDark   : AppColors.glassLight;
 
-  // Semantic (same in both modes — override here agar chahiye)
+  // Semantic
   Color get primary       => AppColors.primary;
   Color get primaryLight  => AppColors.primaryLight;
   Color get primaryDark   => AppColors.primaryDark;
@@ -924,8 +1559,6 @@ class AppColorScheme {
 }
 EOF
 
-  _dart "lib/core/constants/app_text_styles.dart"
-  _dart "lib/core/constants/string_constants.dart"
   _dart "lib/core/constants/enums/status.dart"
   _dart "lib/core/constants/enums/app_enum.dart"
 
