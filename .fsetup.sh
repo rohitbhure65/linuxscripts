@@ -738,7 +738,7 @@ mkflutter() {
     "${B}/test/helpers" \
     "${B}/test/fixtures"
   _yes "$F_WIDGET_TEST"      && mkdir -p "${B}/test/widget/features" "${B}/test/widget/shared"
-  _yes "$F_INTEGRATION_TEST" && mkdir -p "${B}/test/integration_test"
+  _yes "$F_INTEGRATION_TEST" && mkdir -p "${B}/test/integration"
 
   # ════════════════════════════════════════════════════════════════
   # CREATE FILES
@@ -2871,6 +2871,661 @@ EOF
   _yes "$F_SENTRY"        && _dart "lib/core/services/crash_reporting_service.dart"
   _yes "$F_REMOTE_CONFIG" && _dart "lib/core/services/remote_config_service.dart"
 
+# ── Admob service ────────────────────────────────────────────
+_dart "lib/core/services/admob_service.dart"; cat > "${B}/lib/core/services/admob_service.dart" << 'EOF'
+import 'dart:math';
+import 'package:flutter/widgets.dart';
+import 'package:flutter/foundation.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:nextgovjob/core/network/api/api_client.dart';
+import 'package:nextgovjob/core/network/api/api_endpoints.dart';
+import 'package:nextgovjob/core/utils/helper.dart';
+
+/// Delegate interface for ad events
+abstract class AdEventDelegate {
+  void onAdLoaded(String adType);
+  void onAdFailedToLoad(String adType, String error);
+  void onAdDismissed(String adType);
+  void onAdFailedToShow(String adType, String error);
+  void onUserEarnedReward(String adType, int amount);
+  void onBannerAdLoaded();
+  void onBannerAdFailedToLoad(String error);
+}
+
+/// Default empty implementation of AdEventDelegate
+class EmptyAdEventDelegate implements AdEventDelegate {
+  @override
+  void onAdLoaded(String adType) {}
+
+  @override
+  void onAdFailedToLoad(String adType, String error) {}
+
+  @override
+  void onAdDismissed(String adType) {}
+
+  @override
+  void onAdFailedToShow(String adType, String error) {}
+
+  @override
+  void onUserEarnedReward(String adType, int amount) {}
+
+  @override
+  void onBannerAdLoaded() {}
+
+  @override
+  void onBannerAdFailedToLoad(String error) {}
+}
+
+/// Type definition for void callback
+typedef VoidCallback = void Function();
+
+/// Service class for managing Google Mobile Ads
+/// Can be used as:
+/// - Singleton: AdService.instance.showRewardedAd()
+class AdService extends ChangeNotifier {
+  static final AdService _instance = AdService._internal();
+
+  /// Singleton instance - use anywhere with AdService.instance
+  static AdService get instance => _instance;
+
+  InterstitialAd? _interstitialAd;
+  RewardedAd? _rewardedAd;
+  BannerAd? _bannerAd;
+  AdEventDelegate _delegate;
+  double _showProbability;
+  final Random _random = Random();
+  bool _isInitialized = false;
+  bool _adsIsActive = false; // Default to true, will be updated from API
+  bool _adsStatusLoaded = false;
+
+  AdService._internal()
+    : _delegate = EmptyAdEventDelegate(),
+      _showProbability = 0.5;
+
+  /// Whether the ad service has been initialized
+  bool get isInitialized => _isInitialized;
+
+  /// Update the delegate for ad events
+  set delegate(AdEventDelegate value) => _delegate = value;
+
+  /// Update the probability of showing rewarded ads (0.0 to 1.0)
+  set showProbability(double value) {
+    _showProbability = value.clamp(0.0, 1.0);
+    notifyListeners();
+  }
+
+  double get showProbabilityValue => _showProbability;
+
+  /// Whether ads are active (based on server settings)
+  bool get adsIsActive => _adsIsActive;
+
+  /// Whether ads status has been loaded from server
+  bool get adsStatusLoaded => _adsStatusLoaded;
+
+  /// Check if rewarded ad should be shown based on probability
+  bool shouldShowRewardedAd() {
+    return _random.nextDouble() < _showProbability;
+  }
+
+  /// Fetch ads status from the server
+  /// Returns true if ads are enabled, false if disabled
+  Future<bool> fetchAdsStatus() async {
+    try {
+      final response = await ApiClient()
+          .get(ApiEndpoints.adsStatus)
+          .timeout(
+            const Duration(seconds: 5),
+            onTimeout: () {
+              debugPrint('Ads status timeout - assuming ads active');
+              return {
+                'success': false,
+                'data': {'adsIsActive': false},
+              };
+            },
+          );
+      if (response['success'] == true && response['data'] != null) {
+        _adsIsActive = response['data']['adsIsActive'] ?? true;
+        _adsStatusLoaded = true;
+        notifyListeners();
+        return _adsIsActive;
+      }
+    } catch (e) {
+      // If API call fails, default to showing ads
+      debugPrint('Failed to fetch ads status: $e');
+    }
+    // Default to false if there's any error (show ads by default)
+    _adsIsActive = false;
+    _adsStatusLoaded = false;
+    notifyListeners();
+    return _adsIsActive;
+  }
+
+  /// Refresh ads status from server and update ad loading
+  Future<void> refreshAdsStatus() async {
+    await fetchAdsStatus();
+    if (_adsIsActive && !_isInitialized) {
+      loadInterstitialAd();
+      loadRewardedAd();
+      loadBannerAd();
+      _isInitialized = true;
+    } else if (!_adsIsActive) {
+      // Dispose existing ads if ads are disabled
+      _disposeAds();
+      _isInitialized = false;
+    }
+    notifyListeners();
+  }
+
+  /// Dispose ads when disabled
+  void _disposeAds() {
+    _interstitialAd?.dispose();
+    _rewardedAd?.dispose();
+    _bannerAd?.dispose();
+    _interstitialAd = null;
+    _rewardedAd = null;
+    _bannerAd = null;
+  }
+
+  /// Initialize the ad service
+  /// This method fetches the ads status from the server first,
+  /// then loads ads only if ads are enabled
+  Future<void> initialize({
+    AdEventDelegate? delegate,
+    double showProbability = 0.5,
+  }) async {
+    if (_isInitialized) return;
+
+    _delegate = delegate ?? EmptyAdEventDelegate();
+    _showProbability = showProbability.clamp(0.0, 1.0);
+
+    // Fetch ads status from server first
+    await fetchAdsStatus();
+
+    // Only load ads if they are enabled on the server
+    if (_adsIsActive) {
+      _isInitialized = true;
+      loadInterstitialAd();
+      loadRewardedAd();
+      loadBannerAd();
+    } else {
+      // Ads are disabled on server, don't load ads
+      _isInitialized = false;
+      // debugPrint('Ads are disabled on server. Not loading ads.');
+    }
+
+    notifyListeners();
+  }
+
+  /// Initialize with server check (async - recommended to use)
+  /// This is an alias for initialize() to make the intent clearer
+  Future<void> initializeWithServerCheck({
+    AdEventDelegate? delegate,
+    double showProbability = 0.5,
+  }) async {
+    await initialize(delegate: delegate, showProbability: showProbability);
+  }
+
+  /// Load interstitial ad
+  void loadInterstitialAd() {
+    InterstitialAd.load(
+      adUnitId: AdHelper.interstitialAdUnitId,
+      adLoadCallback: InterstitialAdLoadCallback(
+        onAdLoaded: (ad) {
+          _interstitialAd = ad;
+          _setupInterstitialCallbacks();
+          _delegate.onAdLoaded('interstitial');
+          notifyListeners();
+        },
+        onAdFailedToLoad: (error) {
+          _delegate.onAdFailedToLoad('interstitial', error.message);
+        },
+      ),
+      request: AdRequest(),
+    );
+  }
+
+  /// Load rewarded ad
+  void loadRewardedAd() {
+    RewardedAd.load(
+      adUnitId: AdHelper.rewardedAdUnitId,
+      rewardedAdLoadCallback: RewardedAdLoadCallback(
+        onAdLoaded: (ad) {
+          _rewardedAd = ad;
+          _setupRewardedAdCallbacks();
+          _delegate.onAdLoaded('rewarded');
+          notifyListeners();
+        },
+        onAdFailedToLoad: (error) {
+          _delegate.onAdFailedToLoad('rewarded', error.message);
+        },
+      ),
+      request: AdRequest(),
+    );
+  }
+
+  /// Setup interstitial ad callbacks
+  void _setupInterstitialCallbacks() {
+    _interstitialAd?.fullScreenContentCallback = FullScreenContentCallback(
+      onAdDismissedFullScreenContent: (ad) {
+        ad.dispose();
+        _interstitialAd = null;
+        loadInterstitialAd();
+        _delegate.onAdDismissed('interstitial');
+        notifyListeners();
+      },
+      onAdFailedToShowFullScreenContent: (ad, error) {
+        ad.dispose();
+        _interstitialAd = null;
+        loadInterstitialAd();
+        _delegate.onAdFailedToShow('interstitial', error.message);
+        notifyListeners();
+      },
+    );
+  }
+
+  /// Setup rewarded ad callbacks
+  void _setupRewardedAdCallbacks() {
+    _rewardedAd?.fullScreenContentCallback = FullScreenContentCallback(
+      onAdDismissedFullScreenContent: (ad) {
+        ad.dispose();
+        _rewardedAd = null;
+        loadRewardedAd();
+        _delegate.onAdDismissed('rewarded');
+        notifyListeners();
+      },
+      onAdFailedToShowFullScreenContent: (ad, error) {
+        ad.dispose();
+        _rewardedAd = null;
+        loadRewardedAd();
+        _delegate.onAdFailedToShow('rewarded', error.message);
+        notifyListeners();
+      },
+    );
+  }
+
+  /// Load banner ad
+  void loadBannerAd() {
+    BannerAd(
+      size: AdSize.banner,
+      adUnitId: AdHelper.bannerAdUnitId,
+      listener: BannerAdListener(
+        onAdLoaded: (ad) {
+          _bannerAd = ad as BannerAd;
+          _delegate.onBannerAdLoaded();
+          notifyListeners();
+        },
+        onAdFailedToLoad: (ad, error) {
+          debugPrint('Failed to load banner ad: ${error.message}');
+          _delegate.onBannerAdFailedToLoad(error.message);
+          ad.dispose();
+          _bannerAd = null;
+          notifyListeners();
+          // Auto-retry after 30 seconds
+          Future.delayed(const Duration(seconds: 30), loadBannerAd);
+        },
+      ),
+      request: AdRequest(),
+    ).load();
+  }
+
+  /// Get the loaded banner ad for use in widgets
+  BannerAd? get bannerAd => _bannerAd;
+
+  /// Show interstitial ad (if loaded and ads are active)
+  /// Only shows ad if ads are enabled on the server
+  void showInterstitialAd({VoidCallback? onComplete}) {
+    // Check if ads are enabled on the server
+    if (!_adsIsActive) {
+      // debugPrint('Ads are disabled on server. Not showing interstitial ad.');
+      return;
+    }
+
+    if (_interstitialAd != null) {
+      _interstitialAd?.show();
+      onComplete?.call();
+    }
+  }
+
+  /// Show rewarded ad with probability check (if loaded and ads are active)
+  /// Only shows ad if ads are enabled on the server
+  /// Returns true if ad was shown, false if skipped due to probability or disabled
+  bool showRewardedAd({VoidCallback? onComplete}) {
+    // Check if ads are enabled on the server
+    if (!_adsIsActive) {
+      // debugPrint('Ads are disabled on server. Not showing rewarded ad.');
+      return false;
+    }
+
+    if (_rewardedAd != null && shouldShowRewardedAd()) {
+      _rewardedAd?.show(
+        onUserEarnedReward: (ad, reward) {
+          _delegate.onUserEarnedReward('rewarded', reward.amount.toInt());
+        },
+      );
+      onComplete?.call();
+      return true;
+    }
+    return false;
+  }
+
+  /// Force show rewarded ad (bypass probability check but check ads active)
+  /// Only shows ad if ads are enabled on the server
+  void showRewardedAdForced({VoidCallback? onComplete}) {
+    // Check if ads are enabled on the server
+    if (!_adsIsActive) {
+      // debugPrint('Ads are disabled on server. Not showing rewarded ad.');
+      return;
+    }
+
+    if (_rewardedAd != null) {
+      _rewardedAd?.show(
+        onUserEarnedReward: (ad, reward) {
+          _delegate.onUserEarnedReward('rewarded', reward.amount.toInt());
+        },
+      );
+      onComplete?.call();
+    }
+  }
+
+  @override
+  void dispose() {
+    _interstitialAd?.dispose();
+    _rewardedAd?.dispose();
+    _bannerAd?.dispose();
+    _interstitialAd = null;
+    _rewardedAd = null;
+    _bannerAd = null;
+    super.dispose();
+  }
+}
+EOF
+
+
+# ── Connectivity Service ────────────────────────────────────────────
+_dart "lib/core/services/connectivity_service.dart"; cat > "${B}/lib/core/services/connectivity_service.dart" << EOF
+import 'dart:async';
+import 'package:connectivity_plus/connectivity_plus.dart';
+
+class ConnectivityService {
+  static final ConnectivityService _instance = ConnectivityService._internal();
+  factory ConnectivityService() => _instance;
+  ConnectivityService._internal();
+
+  final Connectivity _connectivity = Connectivity();
+
+  // Stream controller to broadcast connectivity changes
+  final StreamController<bool> _connectivityController = StreamController<bool>.broadcast();
+
+  // Current connectivity status
+  bool _isConnected = true;
+  bool get isConnected => _isConnected;
+
+  // Stream for listening to connectivity changes
+  Stream<bool> get connectivityStream => _connectivityController.stream;
+
+  // Initialize and start listening
+  Future<void> initialize() async {
+    // Check initial connectivity
+    await _checkConnectivity();
+
+    // Listen to connectivity changes
+    _connectivity.onConnectivityChanged.listen((List<ConnectivityResult> results) {
+      _handleConnectivityChange(results);
+    });
+  }
+
+  Future<void> _checkConnectivity() async {
+    final results = await _connectivity.checkConnectivity();
+    _handleConnectivityChange(results);
+  }
+
+  void _handleConnectivityChange(List<ConnectivityResult> results) {
+    final wasConnected = _isConnected;
+    _isConnected = results.isNotEmpty &&
+                   !results.contains(ConnectivityResult.none);
+
+    // Only emit if there's a change
+    if (wasConnected != _isConnected) {
+      _connectivityController.add(_isConnected);
+    }
+  }
+
+  // Manual check for current connectivity
+  Future<bool> checkConnectivity() async {
+    final results = await _connectivity.checkConnectivity();
+    _isConnected = results.isNotEmpty &&
+                   !results.contains(ConnectivityResult.none);
+    return _isConnected;
+  }
+
+  // Dispose the stream controller
+  void dispose() {
+    _connectivityController.close();
+  }
+}
+EOF
+
+
+# ── in app review ────────────────────────────────────────────
+_dart "lib/core/services/in_app_review_service.dart"; cat > "${B}/lib/core/services/in_app_review_service.dart" << EOF
+import 'package:flutter/foundation.dart';
+import 'package:in_app_review/in_app_review.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+class InAppReviewService {
+  InAppReviewService._();
+
+  static final InAppReviewService instance = InAppReviewService._();
+
+  static const String _reviewSubmittedKey = 'review_submitted';
+  static const String _reviewRequestedKey = 'review_requested';
+
+  InAppReview get _inAppReview => InAppReview.instance;
+
+  /// Returns true if the user has already submitted a review.
+  Future<bool> hasUserSubmittedReview() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(_reviewSubmittedKey) ?? false;
+    } catch (e) {
+      debugPrint('Error reading review submission status: $e');
+      return false;
+    }
+  }
+
+  /// Returns true if the in-app review flow has already been triggered.
+  Future<bool> hasReviewBeenRequested() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(_reviewRequestedKey) ?? false;
+    } catch (e) {
+      debugPrint('Error reading review request status: $e');
+      return false;
+    }
+  }
+
+  /// Checks if the device/app supports in-app reviews.
+  Future<bool> isAvailable() async {
+    try {
+      return await _inAppReview.isAvailable();
+    } catch (e) {
+      debugPrint('In-app review availability check failed: $e');
+      return false;
+    }
+  }
+
+  /// Marks that the review flow has been triggered.
+  Future<void> _markReviewRequested() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_reviewRequestedKey, true);
+    } catch (e) {
+      debugPrint('Error saving review request status: $e');
+    }
+  }
+
+  /// Marks that the user submitted a review.
+  Future<void> markReviewSubmitted() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_reviewSubmittedKey, true);
+    } catch (e) {
+      debugPrint('Error saving review submitted status: $e');
+    }
+  }
+
+  /// Requests an in-app review if:
+  /// - The user hasn't already submitted one
+  /// - The device supports in-app reviews
+  /// - The review hasn't already been requested this session
+  Future<void> checkAndRequestReview() async {
+    try {
+      if (await hasUserSubmittedReview()) {
+        debugPrint('Review already submitted by user, skipping.');
+        return;
+      }
+
+      if (await hasReviewBeenRequested()) {
+        debugPrint('Review already requested this session, skipping.');
+        return;
+      }
+
+      final available = await isAvailable();
+      if (!available) {
+        debugPrint('In-app review not available on this platform.');
+        return;
+      }
+
+      await _markReviewRequested();
+      await _inAppReview.requestReview();
+
+      debugPrint('In-app review flow completed.');
+    } catch (e) {
+      debugPrint('Error requesting in-app review: $e');
+    }
+  }
+}
+
+EOF
+
+
+# ── update ────────────────────────────────────────────
+_dart "lib/core/services/update_service.dart"; cat > "${B}/lib/core/services/update_service.dart" << EOF
+import 'package:flutter/material.dart';
+import 'package:in_app_update/in_app_update.dart';
+
+class UpdateService {
+  static final UpdateService _instance = UpdateService._internal();
+  factory UpdateService() => _instance;
+  UpdateService._internal();
+
+  bool _isChecking = false;
+  bool _updateStarted = false;
+
+  /// Check for app updates and show dialog if available
+  Future<void> checkForUpdate(BuildContext context) async {
+    if (_isChecking || _updateStarted) return;
+    _isChecking = true;
+
+    try {
+      final AppUpdateInfo updateInfo = await InAppUpdate.checkForUpdate();
+
+      if (updateInfo.updateAvailability == UpdateAvailability.updateAvailable) {
+        if (context.mounted) {
+          _showUpdateDialog(context, updateInfo);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking for updates: $e');
+    } finally {
+      _isChecking = false;
+    }
+  }
+
+  /// Show update available dialog
+  void _showUpdateDialog(BuildContext context, AppUpdateInfo updateInfo) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Update Available'),
+        content: const Text(
+          'A new version of the app is available. Would you like to update now?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(
+              'Later',
+              style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600]),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              _startImmediateUpdate(context);
+            },
+            child: const Text('Update'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Start immediate update (user must stay on screen)
+  Future<void> _startImmediateUpdate(BuildContext context) async {
+    _updateStarted = true;
+
+    try {
+      final AppUpdateInfo updateInfo = await InAppUpdate.checkForUpdate();
+
+      if (updateInfo.updateAvailability == UpdateAvailability.updateAvailable) {
+        await InAppUpdate.performImmediateUpdate();
+        // If we get here, update was successful
+        debugPrint('Update completed successfully');
+      }
+    } catch (e) {
+      debugPrint('Error during immediate update: $e');
+      if (context.mounted) {
+        _showUpdateFailedSnackbar(context);
+      }
+      _updateStarted = false;
+    }
+  }
+
+  /// Show snackbar when update fails
+  void _showUpdateFailedSnackbar(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Row(
+          children: [
+            Icon(Icons.error_outline, color: Colors.white),
+            SizedBox(width: 12),
+            Text('Update failed. Please try again later.'),
+          ],
+        ),
+        backgroundColor: isDark ? Colors.white : Colors.black,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+
+  /// Reset update flag (can be called after app restart)
+  void resetUpdateState() {
+    _updateStarted = false;
+  }
+}
+EOF
+
+
 if _yes "$F_FIREBASE_AUTH"; then
   mkdir -p "${B}/lib/core/services/firebase"
 
@@ -3895,8 +4550,8 @@ EOF
   fi
 
   if _yes "$F_INTEGRATION_TEST"; then
-    _dart "test/integration_test/app_test.dart"
-    _dart "test/integration_test/auth_flow_test.dart"
+    _dart "test/integration/app_test.dart"
+    _dart "test/integration/auth_flow_test.dart"
   fi
 
   # ════════════════════════════════════════════════════════════════
@@ -4835,7 +5490,7 @@ EOF
 "
   _yes "$F_WIDGET_TEST"      && _ARCH_TEST="${_ARCH_TEST}- **Widget tests**: \`test/widget/\` — UI component rendering
 "
-  _yes "$F_INTEGRATION_TEST" && _ARCH_TEST="${_ARCH_TEST}- **Integration tests**: \`test/integration_test/\` — full E2E flows
+  _yes "$F_INTEGRATION_TEST" && _ARCH_TEST="${_ARCH_TEST}- **Integration tests**: \`test/integration/\` — full E2E flows
 "
   [[ -z "$_ARCH_TEST" ]] && _ARCH_TEST="_(No test targets were enabled during scaffold. Add them manually under \`test/\`.)_"
 
