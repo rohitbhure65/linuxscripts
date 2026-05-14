@@ -921,23 +921,6 @@ abstract final class AppAssets {
 }
 EOF
 
-  _dart "lib/core/constants/app_duration.dart"; cat > "${B}/lib/core/constants/app_duration.dart" << EOF
-// ── DURATIONS (timeouts / debounce) ──────────────────────
-abstract final class AppDurations {
-  static const Duration searchDebounce     = Duration(milliseconds: 400);
-  static const Duration inputDebounce      = Duration(milliseconds: 300);
-  static const Duration buttonThrottle     = Duration(milliseconds: 500);
-  static const Duration sessionTimeout     = Duration(minutes: 30);
-  static const Duration tokenRefreshBuffer = Duration(minutes: 5);
-  static const Duration otpExpiry          = Duration(minutes: 10);
-  static const Duration splashDelay        = Duration(seconds: 2);
-  static const Duration toastDuration      = Duration(seconds: 3);
-  static const Duration longPressDelay     = Duration(milliseconds: 400);
-  static const Duration doubleTapWindow    = Duration(milliseconds: 300);
-  static const Duration autoScrollDelay    = Duration(milliseconds: 100);
-}
-EOF
-
   _dart "lib/core/constants/app_pagination.dart"; cat > "${B}/lib/core/constants/app_pagination.dart" << EOF
 // ── PAGINATION ───────────────────────────────────────────
 abstract final class AppPagination {
@@ -2070,14 +2053,14 @@ EOF
   _dart "lib/core/errors/failures.dart"
   _dart "lib/core/errors/error_messages.dart"
 
-  if [[ "$API_CHOICE" == "1" || "$API_CHOICE" == "5" ]]; then
-    _dart "lib/core/network/api/api_client.dart"; cat > "${B}/lib/core/network/api/api_client.dart" << EOF
+if [[ "$API_CHOICE" == "1" || "$API_CHOICE" == "5" ]]; then
+  _dart "lib/core/network/api/api_client.dart"; cat > "${B}/lib/core/network/api/api_client.dart" << 'EOF'
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
-import 'package:${PROJECT_NAME}/core/constants/app_api.dart';
+import 'package:rohit/core/constants/app_api.dart';
 
 // ─────────────────────────────────────────────────────────────
 //  ApiException
@@ -2908,13 +2891,12 @@ class FirebaseService {
 }
 EOF
 
- _dart "lib/core/services/firebase/firebase_auth_service.dart"; cat > "${B}/lib/core/services/firebase/firebase_auth_service.dart" << EOF
+ _dart "lib/core/services/firebase/firebase_auth_service.dart"; cat > "${B}/lib/core/services/firebase/firebase_auth_service.dart" << 'EOF'
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:${PROJECT_NAME}/core/network/api/api_client.dart';
-import 'package:${PROJECT_NAME}/core/network/api/api_endpoints.dart';
-import 'package:${PROJECT_NAME}/data/models/user_model.dart';
+import 'package:rohit/core/network/api/api_client.dart';
+import 'package:rohit/core/network/api/api_endpoints.dart';
 
 class AuthService {
   // ── Firebase & Google ─────────────────────────────────────
@@ -3023,10 +3005,9 @@ class AuthService {
     return null;
   }
 }
-
 EOF
 
- _dart "lib/core/services/firebase/firebase_messaging_service.dart"; cat > "${B}/lib/core/services/firebase/firebase_messaging_service.dart" << EOF
+ _dart "lib/core/services/firebase/firebase_messaging_service.dart"; cat > "${B}/lib/core/services/firebase/firebase_messaging_service.dart" << 'EOF'
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 
