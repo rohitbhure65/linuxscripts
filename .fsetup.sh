@@ -2073,7 +2073,7 @@ EOF
 
 # ── BARREL EXPORT ────────────────────────────────────────────
 _dart "lib/core/constants/enums/app_enums.dart"; cat > "${B}/lib/core/constants/enums/app_enums.dart" << EOF
-// ── Barrel export – sirf yeh ek import poore app mein ──
+// ── Barrel export ────────────────────
 export 'app_theme_mode.dart';
 export 'auth_status.dart';
 export 'auth_provider.dart';
@@ -2121,9 +2121,548 @@ EOF
   fi
   _yes "$F_CONNECTIVITY" && _dart "lib/core/network/connectivity/connectivity_service.dart"
 
-  _dart "lib/core/cache/cache_manager.dart"
-  _dart "lib/core/cache/cache_keys.dart"
-  _dart "lib/core/cache/cache_policy.dart"
+# ── 1. CACHE KEYS ────────────────────────────────────────────
+_dart "lib/core/cache/cache_keys.dart"; cat > "${B}/lib/core/cache/cache_keys.dart" << EOF
+// ─────────────────────────────────────────────────────────────
+// CacheKeys
+//
+// Single source of truth for all cache key strings used
+// throughout the application.
+//
+// Rules:
+//   - Never use raw strings for cache keys anywhere in the codebase.
+//   - Always reference a constant or helper method from this class.
+//   - Key format:  cache:<domain>:<identifier>
+// ─────────────────────────────────────────────────────────────
+
+abstract final class CacheKeys {
+
+  // ── Authentication ────────────────────────────────────────
+
+  /// JWT access token issued by the server.
+  static const String authToken     = 'cache:auth:token';
+
+  /// Long-lived refresh token used to obtain a new access token.
+  static const String refreshToken  = 'cache:auth:refresh_token';
+
+  /// Unique identifier of the currently authenticated user.
+  static const String userId        = 'cache:auth:user_id';
+
+  /// Email address of the currently authenticated user.
+  static const String userEmail     = 'cache:auth:user_email';
+
+  /// ISO-8601 timestamp at which the current session expires.
+  static const String sessionExpiry = 'cache:auth:session_expiry';
+
+  // ── User / Profile ────────────────────────────────────────
+
+  /// Full user profile object serialised as JSON.
+  static const String userProfile   = 'cache:user:profile';
+
+  /// User-defined application settings serialised as JSON.
+  static const String userSettings  = 'cache:user:settings';
+
+  /// Lightweight user preferences (theme, locale, notifications).
+  static const String userPrefs     = 'cache:user:prefs';
+
+  /// Remote URL or local path of the user avatar image.
+  static const String userAvatar    = 'cache:user:avatar';
+
+  // ── Application State ─────────────────────────────────────
+
+  /// Whether the user has completed the onboarding flow.
+  static const String onboarded     = 'cache:app:onboarded';
+
+  /// Persisted theme mode: light | dark | system.
+  static const String themeMode     = 'cache:app:theme_mode';
+
+  /// BCP-47 locale code selected by the user (e.g. "en", "hi").
+  static const String locale        = 'cache:app:locale';
+
+  /// Whether this is the very first launch of the application.
+  static const String firstLaunch   = 'cache:app:first_launch';
+
+  /// Semver string of the last app version that was launched.
+  static const String lastVersion   = 'cache:app:last_version';
+
+  /// ISO-8601 timestamp of the last successful data sync.
+  static const String lastSyncAt    = 'cache:app:last_sync_at';
+
+  // ── Notifications ─────────────────────────────────────────
+
+  /// Whether the user has granted push-notification permission.
+  static const String pushEnabled   = 'cache:notif:push_enabled';
+
+  /// Timestamp of the last notification the user has viewed.
+  static const String lastNotifSeen = 'cache:notif:last_seen';
+
+  // ── Subscription ──────────────────────────────────────────
+
+  /// Active subscription plan identifier (free | monthly | yearly | lifetime).
+  static const String subPlan       = 'cache:sub:plan';
+
+  /// ISO-8601 expiry date of the active subscription.
+  static const String subExpiry     = 'cache:sub:expiry';
+
+  /// Current subscription status (active | expired | cancelled).
+  static const String subStatus     = 'cache:sub:status';
+
+  // ── Search ────────────────────────────────────────────────
+
+  /// JSON-encoded list of recent search query strings.
+  static const String searchHistory = 'cache:search:history';
+
+  /// JSON-encoded list of recently accessed file identifiers.
+  static const String recentFiles   = 'cache:files:recent';
+
+  // ── Dynamic Key Builders ──────────────────────────────────
+  // Use these factory methods when the key depends on a runtime value.
+
+  /// Cache key for a single file identified by [id].
+  static String file(String id)     => 'cache:file:\$id';
+
+  /// Cache key for a single document identified by [id].
+  static String document(String id) => 'cache:doc:\$id';
+
+  /// Cache key for a paginated page at the given route [name].
+  static String page(String name)   => 'cache:page:\$name';
+
+  /// Cache key for a query result identified by its [hash].
+  static String query(String hash)  => 'cache:query:\$hash';
+
+  /// Cache key for a remote image identified by its [url].
+  static String image(String url)   => 'cache:img:\$url';
+
+  /// Cache key for a user record identified by [id].
+  static String userById(String id) => 'cache:user:\$id';
+}
+EOF
+
+# ── 2. CACHE POLICY ──────────────────────────────────────────
+_dart "lib/core/cache/cache_policy.dart"; cat > "${B}/lib/core/cache/cache_policy.dart" << EOF
+// ─────────────────────────────────────────────────────────────
+// CachePolicy
+//
+// Defines the time-to-live (TTL) and fetch strategy for each
+// category of cached data.
+//
+// Usage:
+//   await CacheManager.instance.setJson(
+//     CacheKeys.userProfile,
+//     data,
+//     policy: CachePolicy.userProfile,
+//   );
+// ─────────────────────────────────────────────────────────────
+
+// ── Cache Strategy ───────────────────────────────────────────
+
+/// Determines the source of data and the order in which sources
+/// are consulted when reading a cached value.
+enum CacheStrategy {
+  /// Return data from cache only. Never contact the network.
+  /// Suitable for fully offline scenarios.
+  cacheOnly,
+
+  /// Always fetch from the network. Never read from cache.
+  /// Suitable for data that must always be current.
+  networkOnly,
+
+  /// Return cached data when available and unexpired;
+  /// otherwise fall back to the network.
+  /// Best for data that rarely changes.
+  cacheFirst,
+
+  /// Always attempt the network first.
+  /// Fall back to cached data only on failure.
+  /// Best for frequently updated data.
+  networkFirst,
+
+  /// Immediately return stale cached data (if present),
+  /// then trigger a background revalidation.
+  /// Best for feeds where instant display matters more than freshness.
+  staleWhileRevalidate,
+}
+
+// ── Cache Policy ─────────────────────────────────────────────
+
+/// Encapsulates the caching rules applied to a single cache entry.
+class CachePolicy {
+  const CachePolicy({
+    required this.ttl,
+    this.strategy = CacheStrategy.cacheFirst,
+    this.maxStaleAge,
+    this.encrypt = false,
+  });
+
+  /// Maximum age of a cached value before it is considered expired.
+  /// Use [Duration.zero] to disable TTL (the entry never expires).
+  final Duration ttl;
+
+  /// The fetch strategy applied when reading this entry.
+  final CacheStrategy strategy;
+
+  /// Only relevant for [CacheStrategy.staleWhileRevalidate].
+  /// The maximum age of stale data that may still be served while
+  /// a background refresh is in progress.
+  final Duration? maxStaleAge;
+
+  /// When true, the value is encrypted before being written to disk.
+  /// Enable for tokens, personal data, or any sensitive content.
+  final bool encrypt;
+
+  /// Returns true when this policy has a finite TTL.
+  bool get isExpirable => ttl != Duration.zero;
+
+  // ── Predefined Policies ───────────────────────────────────
+
+  /// Short-lived, encrypted policy for authentication tokens.
+  static const CachePolicy auth = CachePolicy(
+    ttl:      Duration(hours: 1),
+    strategy: CacheStrategy.cacheFirst,
+    encrypt:  true,
+  );
+
+  /// Medium-lived policy for the user profile.
+  /// The network is tried first to ensure reasonable freshness.
+  static const CachePolicy userProfile = CachePolicy(
+    ttl:      Duration(hours: 6),
+    strategy: CacheStrategy.networkFirst,
+  );
+
+  /// Long-lived policy for application settings and preferences.
+  static const CachePolicy settings = CachePolicy(
+    ttl:      Duration(days: 30),
+    strategy: CacheStrategy.cacheFirst,
+  );
+
+  /// Policy for feeds and lists where instant display is preferred.
+  static const CachePolicy feed = CachePolicy(
+    ttl:         Duration(minutes: 10),
+    strategy:    CacheStrategy.staleWhileRevalidate,
+    maxStaleAge: Duration(hours: 1),
+  );
+
+  /// Short-lived policy for search results.
+  static const CachePolicy search = CachePolicy(
+    ttl:      Duration(minutes: 5),
+    strategy: CacheStrategy.networkFirst,
+  );
+
+  /// Long-lived policy for images and other media assets.
+  static const CachePolicy media = CachePolicy(
+    ttl:      Duration(days: 7),
+    strategy: CacheStrategy.cacheFirst,
+  );
+
+  /// Policy for static reference data that almost never changes
+  /// (country lists, currency tables, FAQ content, etc.).
+  static const CachePolicy staticData = CachePolicy(
+    ttl:      Duration(days: 365),
+    strategy: CacheStrategy.cacheFirst,
+  );
+
+  /// Bypass policy — data is never read from or written to the cache.
+  static const CachePolicy noCache = CachePolicy(
+    ttl:      Duration.zero,
+    strategy: CacheStrategy.networkOnly,
+  );
+
+  /// Short-lived encrypted policy scoped to the current user session.
+  static const CachePolicy session = CachePolicy(
+    ttl:      Duration(hours: 12),
+    strategy: CacheStrategy.cacheFirst,
+    encrypt:  true,
+  );
+
+  // ── Utilities ─────────────────────────────────────────────
+
+  /// Returns a copy of this policy with the specified fields replaced.
+  CachePolicy copyWith({
+    Duration?      ttl,
+    CacheStrategy? strategy,
+    Duration?      maxStaleAge,
+    bool?          encrypt,
+  }) {
+    return CachePolicy(
+      ttl:         ttl         ?? this.ttl,
+      strategy:    strategy    ?? this.strategy,
+      maxStaleAge: maxStaleAge ?? this.maxStaleAge,
+      encrypt:     encrypt     ?? this.encrypt,
+    );
+  }
+}
+EOF
+
+# ── 3. CACHE MANAGER ─────────────────────────────────────────
+_dart "lib/core/cache/cache_manager.dart"; cat > "${B}/lib/core/cache/cache_manager.dart" << EOF
+// ─────────────────────────────────────────────────────────────
+// CacheManager
+//
+// A thin, policy-aware wrapper around SharedPreferences.
+// Handles reading, writing, expiry checking, and invalidation
+// of cached values throughout the application.
+//
+// Lifecycle:
+//   Call [init] once at application startup before invoking
+//   any other method on this class.
+//
+// Example:
+//   // Initialise once in main.dart
+//   await CacheManager.instance.init();
+//
+//   // Write a value
+//   await CacheManager.instance.setJson(
+//     CacheKeys.userProfile,
+//     user.toJson(),
+//     policy: CachePolicy.userProfile,
+//   );
+//
+//   // Read a value
+//   final json = CacheManager.instance.getJson(CacheKeys.userProfile);
+//
+//   // Remove a specific entry
+//   await CacheManager.instance.remove(CacheKeys.userProfile);
+//
+//   // Remove all entries whose keys start with a prefix
+//   await CacheManager.instance.removeWhere('cache:file:');
+// ─────────────────────────────────────────────────────────────
+
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'cache_policy.dart';
+
+// ── Internal Entry Model ──────────────────────────────────────
+
+/// Wraps a cached payload with its expiry timestamp.
+/// Instances are serialised to JSON and stored in SharedPreferences.
+class _CacheEntry {
+  const _CacheEntry({
+    required this.data,
+    required this.expiresAt,
+  });
+
+  /// The cached payload (a raw string or a JSON-encoded string).
+  final String data;
+
+  /// The point in time after which this entry is stale.
+  final DateTime expiresAt;
+
+  /// Returns true when [DateTime.now] has passed [expiresAt].
+  bool get isExpired => DateTime.now().isAfter(expiresAt);
+
+  Map<String, dynamic> toJson() => {
+    'data':      data,
+    'expiresAt': expiresAt.toIso8601String(),
+  };
+
+  factory _CacheEntry.fromJson(Map<String, dynamic> json) => _CacheEntry(
+    data:      json['data']      as String,
+    expiresAt: DateTime.parse(json['expiresAt'] as String),
+  );
+}
+
+// ── Cache Manager ─────────────────────────────────────────────
+
+class CacheManager {
+  CacheManager._();
+
+  /// The application-wide singleton instance.
+  static final CacheManager instance = CacheManager._();
+
+  SharedPreferences? _prefs;
+
+  // ── Initialisation ────────────────────────────────────────
+
+  /// Initialises the underlying [SharedPreferences] instance.
+  ///
+  /// Must be awaited once before any other method is called,
+  /// typically at the top of [main].
+  Future<void> init() async {
+    _prefs ??= await SharedPreferences.getInstance();
+  }
+
+  SharedPreferences get _p {
+    assert(
+      _prefs != null,
+      'CacheManager.init() must be called before accessing the cache.',
+    );
+    return _prefs!;
+  }
+
+  // ── Write Operations ──────────────────────────────────────
+
+  /// Stores a [String] value under [key] with the given [policy].
+  Future<void> setString(
+    String key,
+    String value, {
+    CachePolicy policy = CachePolicy.session,
+  }) async {
+    final entry = _CacheEntry(
+      data:      value,
+      expiresAt: DateTime.now().add(policy.ttl),
+    );
+    await _p.setString(key, jsonEncode(entry.toJson()));
+  }
+
+  /// Stores a JSON-serialisable [Map] under [key] with the given [policy].
+  Future<void> setJson(
+    String key,
+    Map<String, dynamic> value, {
+    CachePolicy policy = CachePolicy.session,
+  }) async {
+    await setString(key, jsonEncode(value), policy: policy);
+  }
+
+  /// Stores a [bool] value under [key].
+  ///
+  /// Boolean values carry no TTL and persist until explicitly removed.
+  Future<void> setBool(String key, {required bool value}) async {
+    await _p.setBool(key, value);
+  }
+
+  /// Stores an [int] value under [key].
+  Future<void> setInt(String key, int value) async {
+    await _p.setInt(key, value);
+  }
+
+  /// Stores a [List<String>] under [key] with the given [policy].
+  Future<void> setStringList(
+    String key,
+    List<String> value, {
+    CachePolicy policy = CachePolicy.session,
+  }) async {
+    await setString(key, jsonEncode(value), policy: policy);
+  }
+
+  // ── Read Operations ───────────────────────────────────────
+
+  /// Returns the cached [String] for [key].
+  ///
+  /// Returns null when the entry does not exist or has expired.
+  /// Expired entries are removed automatically.
+  String? getString(String key) {
+    final raw = _p.getString(key);
+    if (raw == null) return null;
+
+    try {
+      final entry = _CacheEntry.fromJson(
+        jsonDecode(raw) as Map<String, dynamic>,
+      );
+      if (entry.isExpired) {
+        remove(key);
+        return null;
+      }
+      return entry.data;
+    } catch (_) {
+      // Value was stored as a plain string without a TTL wrapper.
+      return raw;
+    }
+  }
+
+  /// Returns the cached [Map] for [key].
+  ///
+  /// Returns null when the entry is absent, expired, or cannot be decoded.
+  Map<String, dynamic>? getJson(String key) {
+    final raw = getString(key);
+    if (raw == null) return null;
+    try {
+      return jsonDecode(raw) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Returns the cached [bool] for [key], or [defaultValue] when absent.
+  bool getBool(String key, {bool defaultValue = false}) =>
+      _p.getBool(key) ?? defaultValue;
+
+  /// Returns the cached [int] for [key], or [defaultValue] when absent.
+  int getInt(String key, {int defaultValue = 0}) =>
+      _p.getInt(key) ?? defaultValue;
+
+  /// Returns the cached [List<String>] for [key].
+  ///
+  /// Returns null when the entry is absent, expired, or cannot be decoded.
+  List<String>? getStringList(String key) {
+    final raw = getString(key);
+    if (raw == null) return null;
+    try {
+      return (jsonDecode(raw) as List).cast<String>();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Returns true when a valid, unexpired entry exists for [key].
+  bool has(String key) => getString(key) != null;
+
+  // ── Invalidation ──────────────────────────────────────────
+
+  /// Removes the single entry stored under [key].
+  Future<void> remove(String key) async {
+    await _p.remove(key);
+  }
+
+  /// Removes all entries whose keys begin with [prefix].
+  ///
+  /// Example — remove every file cache entry:
+  ///   await CacheManager.instance.removeWhere('cache:file:');
+  Future<void> removeWhere(String prefix) async {
+    final keys = _p.getKeys().where((k) => k.startsWith(prefix)).toList();
+    for (final k in keys) {
+      await _p.remove(k);
+    }
+  }
+
+  /// Scans all stored entries and removes those that have expired.
+  ///
+  /// Call this periodically (e.g. on app resume) to reclaim storage
+  /// and keep SharedPreferences lean.
+  Future<void> evictExpired() async {
+    final keys = _p.getKeys().toList();
+    for (final key in keys) {
+      final raw = _p.getString(key);
+      if (raw == null) continue;
+      try {
+        final entry = _CacheEntry.fromJson(
+          jsonDecode(raw) as Map<String, dynamic>,
+        );
+        if (entry.isExpired) await _p.remove(key);
+      } catch (_) {
+        // Entry is a plain value with no TTL wrapper — leave it untouched.
+      }
+    }
+  }
+
+  /// Removes every key from SharedPreferences.
+  ///
+  /// Use with caution — this erases all persisted data,
+  /// not only cache entries.
+  Future<void> clearAll() async => _p.clear();
+
+  /// Removes only entries that follow the "cache:" naming convention,
+  /// leaving other SharedPreferences values (device settings, etc.) intact.
+  Future<void> clearCache() async => removeWhere('cache:');
+}
+EOF
+
+# ── BARREL EXPORT ────────────────────────────────────────────
+_dart "lib/core/cache/cache.dart"; cat > "${B}/lib/core/cache/cache.dart" << EOF
+// ─────────────────────────────────────────────────────────────
+// Cache barrel export.
+//
+// Import this single file to access all cache utilities.
+//
+// Usage:
+//   import 'package:your_app/core/cache/cache.dart';
+// ─────────────────────────────────────────────────────────────
+
+export 'cache_keys.dart';
+export 'cache_policy.dart';
+export 'cache_manager.dart';
+EOF
+
+
 
   _dart "lib/core/services/navigation_service.dart"
   _dart "lib/core/services/storage_service.dart"
