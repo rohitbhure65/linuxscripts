@@ -669,6 +669,7 @@ mkflutter() {
     "${B}/lib/core/resources"
   _yes "$F_LOGGING" && mkdir -p "${B}/lib/core/logger"
 
+
   for FEATURE in auth profile settings; do
     mkdir -p \
       "${B}/lib/features/${FEATURE}/data/datasources" \
@@ -1153,41 +1154,41 @@ abstract final class AppLayout {
 EOF
 
   _dart "lib/core/constants/app_api.dart"; cat > "${B}/lib/core/constants/app_api.dart" << EOF
-// ── API / NETWORK ─────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+//  AppApi — Network configuration
+//  Single source of truth for URLs, timeouts, headers & retries.
+//  Endpoints live in ApiEndpoints.
+// ─────────────────────────────────────────────────────────────
 abstract final class AppApi {
-  static const String baseUrl    = 'https://api.rohit.bhure.com/v1';
-  static const String cdnUrl     = 'https://cdn.rohit.bhure.com';
-  static const String socketUrl  = 'wss://ws.rohit.bhure.com';
+  // ── URLs ──────────────────────────────────────────────────
+  static const String baseUrl   = 'https://api.${PROJECT_NAME}.com/v1';
+  static const String cdnUrl    = 'https://cdn.${PROJECT_NAME}.com';
+  static const String socketUrl = 'wss://ws.${PROJECT_NAME}.com';
 
+  // ── Timeouts ──────────────────────────────────────────────
   static const Duration connectTimeout = Duration(seconds: 15);
   static const Duration receiveTimeout = Duration(seconds: 30);
   static const Duration sendTimeout    = Duration(seconds: 30);
 
-  static const int maxRetries      = 3;
-  static const int retryDelayMs    = 500;
-  static const int maxPageSize     = 20;
+  // ── Retry ─────────────────────────────────────────────────
+  static const int maxRetries   = 3;
+  static const int retryDelayMs = 500;
 
-  // Headers
+  // ── Pagination ────────────────────────────────────────────
+  static const int maxPageSize = 20;
+
+  // ── Header keys ───────────────────────────────────────────
   static const String headerAuth        = 'Authorization';
   static const String headerContentType = 'Content-Type';
   static const String headerAccept      = 'Accept';
   static const String headerDeviceId    = 'X-Device-Id';
   static const String headerAppVersion  = 'X-App-Version';
   static const String headerPlatform    = 'X-Platform';
-  static const String valueJson         = 'application/json';
-  static const String valueBearer       = 'Bearer ';
 
-  // Endpoints
-  static const String endpointAuth      = '/auth';
-  static const String endpointLogin     = '/auth/login';
-  static const String endpointRegister  = '/auth/register';
-  static const String endpointLogout    = '/auth/logout';
-  static const String endpointRefresh   = '/auth/refresh';
-  static const String endpointProfile   = '/user/profile';
-  static const String endpointUpload    = '/upload';
-  static const String endpointSettings  = '/settings';
+  // ── Header values ─────────────────────────────────────────
+  static const String valueJson   = 'application/json';
+  static const String valueBearer = 'Bearer ';
 }
-
 EOF
 
   _dart "lib/core/constants/app_storage.dart"; cat > "${B}/lib/core/constants/app_storage.dart" << EOF
@@ -1515,47 +1516,6 @@ abstract final class AppColors {
   static const Color grey300 = _Palette.slate300;
   static const Color grey400 = _Palette.slate400;
   static const Color grey500 = _Palette.slate500;
-}
-
-// ─────────────────────────────────────────────
-// 3. THEME HELPER  –  return correct token
-//    based on current brightness (light/dark mode).
-//    Usage:  AppColorScheme.of(context).surface
-// ─────────────────────────────────────────────
-class AppColorScheme {
-  const AppColorScheme._({required this.brightness});
-
-  factory AppColorScheme.of(BuildContext context) {
-    return AppColorScheme._(
-      brightness: Theme.of(context).brightness,
-    );
-  }
-
-  final Brightness brightness;
-  bool get _isDark => brightness == Brightness.dark;
-
-  Color get background  => _isDark ? AppColors.backgroundDark  : AppColors.background;
-  Color get surface     => _isDark ? AppColors.surfaceDark      : AppColors.surface;
-  Color get card        => _isDark ? AppColors.cardDark         : AppColors.card;
-
-  Color get textPrimary   => _isDark ? AppColors.textPrimaryDark   : AppColors.textPrimary;
-  Color get textSecondary => _isDark ? AppColors.textSecondaryDark : AppColors.textSecondary;
-  Color get textDisabled  => _isDark ? AppColors.textDisabledDark  : AppColors.textDisabled;
-
-  Color get border   => _isDark ? AppColors.borderDark  : AppColors.border;
-  Color get divider  => _isDark ? AppColors.dividerDark : AppColors.divider;
-  Color get shadow   => _isDark ? AppColors.shadowDark  : AppColors.shadow;
-  Color get glass    => _isDark ? AppColors.glassDark   : AppColors.glassLight;
-
-  // Semantic
-  Color get primary       => AppColors.primary;
-  Color get primaryLight  => AppColors.primaryLight;
-  Color get primaryDark   => AppColors.primaryDark;
-  Color get secondary     => AppColors.secondary;
-  Color get success       => AppColors.success;
-  Color get warning       => AppColors.warning;
-  Color get error         => AppColors.error;
-  Color get info          => AppColors.info;
 }
 EOF
 
@@ -2111,8 +2071,262 @@ EOF
   _dart "lib/core/errors/error_messages.dart"
 
   if [[ "$API_CHOICE" == "1" || "$API_CHOICE" == "5" ]]; then
-    _dart "lib/core/network/api/api_client.dart"
-    _dart "lib/core/network/api/api_endpoints.dart"
+    _dart "lib/core/network/api/api_client.dart"; cat > "${B}/lib/core/network/api/api_client.dart" << EOF
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:http/http.dart' as http;
+import 'package:${PROJECT_NAME}/core/constants/app_api.dart';
+
+// ─────────────────────────────────────────────────────────────
+//  ApiException
+// ─────────────────────────────────────────────────────────────
+class ApiException implements Exception {
+  const ApiException(this.message, {this.statusCode});
+
+  final String message;
+  final int? statusCode;
+
+  bool get isUnauthorized  => statusCode == 401;
+  bool get isForbidden     => statusCode == 403;
+  bool get isNotFound      => statusCode == 404;
+  bool get isServerError   => statusCode != null && statusCode! >= 500;
+
+  @override
+  String toString() => 'ApiException($statusCode): $message';
+}
+
+// ─────────────────────────────────────────────────────────────
+//  TokenProvider — implement with your Firebase / JWT logic
+// ─────────────────────────────────────────────────────────────
+abstract class TokenProvider {
+  Future<String?> getAccessToken();
+  Future<String?> refreshAccessToken();
+}
+
+// ─────────────────────────────────────────────────────────────
+//  ApiClient
+// ─────────────────────────────────────────────────────────────
+class ApiClient {
+  ApiClient._internal();
+  static final ApiClient _instance = ApiClient._internal();
+  factory ApiClient() => _instance;
+
+  TokenProvider? _tokenProvider;
+
+  /// Call once in main() / DI setup before any requests.
+  void configure({TokenProvider? tokenProvider}) {
+    _tokenProvider = tokenProvider;
+  }
+
+  // ── HTTP client (connection-pooled) ──────────────────────
+  static http.Client? _client;
+  http.Client get _httpClient => _client ??= http.Client();
+
+  // ── Build headers ────────────────────────────────────────
+  Future<Map<String, String>> _buildHeaders({bool auth = false}) async {
+    final headers = <String, String>{
+      AppApi.headerContentType: AppApi.valueJson,
+      AppApi.headerAccept: AppApi.valueJson,
+    };
+    if (auth && _tokenProvider != null) {
+      final token = await _tokenProvider!.getAccessToken();
+      if (token != null) {
+        headers[AppApi.headerAuth] = '${AppApi.valueBearer}$token';
+      }
+    }
+    return headers;
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  Public methods
+  // ─────────────────────────────────────────────────────────
+
+  Future<dynamic> get(
+    String endpoint, {
+    Map<String, String>? queryParams,
+    bool auth = false,
+  }) =>
+      _withRetry(() async {
+        Uri uri = Uri.parse('${AppApi.baseUrl}$endpoint');
+        if (queryParams != null) {
+          uri = uri.replace(queryParameters: queryParams);
+        }
+        final res = await _httpClient
+            .get(uri, headers: await _buildHeaders(auth: auth))
+            .timeout(AppApi.receiveTimeout);
+        return _handleResponse(res);
+      });
+
+  Future<dynamic> post(
+    String endpoint, {
+    Map<String, dynamic>? body,
+    bool auth = false,
+  }) =>
+      _withRetry(() async {
+        final uri = Uri.parse('${AppApi.baseUrl}$endpoint');
+        final res = await _httpClient
+            .post(
+              uri,
+              headers: await _buildHeaders(auth: auth),
+              body: body != null ? jsonEncode(body) : null,
+            )
+            .timeout(AppApi.sendTimeout);
+        return _handleResponse(res);
+      });
+
+  Future<dynamic> put(
+    String endpoint, {
+    Map<String, dynamic>? body,
+    bool auth = false,
+  }) =>
+      _withRetry(() async {
+        final uri = Uri.parse('${AppApi.baseUrl}$endpoint');
+        final res = await _httpClient
+            .put(
+              uri,
+              headers: await _buildHeaders(auth: auth),
+              body: body != null ? jsonEncode(body) : null,
+            )
+            .timeout(AppApi.sendTimeout);
+        return _handleResponse(res);
+      });
+
+  Future<dynamic> patch(
+    String endpoint, {
+    Map<String, dynamic>? body,
+    bool auth = false,
+  }) =>
+      _withRetry(() async {
+        final uri = Uri.parse('${AppApi.baseUrl}$endpoint');
+        final res = await _httpClient
+            .patch(
+              uri,
+              headers: await _buildHeaders(auth: auth),
+              body: body != null ? jsonEncode(body) : null,
+            )
+            .timeout(AppApi.sendTimeout);
+        return _handleResponse(res);
+      });
+
+  Future<dynamic> delete(
+    String endpoint, {
+    bool auth = false,
+  }) =>
+      _withRetry(() async {
+        final uri = Uri.parse('${AppApi.baseUrl}$endpoint');
+        final res = await _httpClient
+            .delete(uri, headers: await _buildHeaders(auth: auth))
+            .timeout(AppApi.receiveTimeout);
+        return _handleResponse(res);
+      });
+
+  // ─────────────────────────────────────────────────────────
+  //  Retry
+  // ─────────────────────────────────────────────────────────
+
+  Future<T> _withRetry<T>(Future<T> Function() fn, {int attempt = 1}) async {
+    try {
+      return await fn();
+    } on ApiException catch (e) {
+      if (e.statusCode != null && e.statusCode! < 500) rethrow;
+      if (attempt >= AppApi.maxRetries) rethrow;
+      await _delay(attempt);
+      return _withRetry(fn, attempt: attempt + 1);
+    } on SocketException {
+      if (attempt >= AppApi.maxRetries) _throwMaintenance();
+      await _delay(attempt);
+      return _withRetry(fn, attempt: attempt + 1);
+    } on TimeoutException {
+      if (attempt >= AppApi.maxRetries) _throwMaintenance();
+      await _delay(attempt);
+      return _withRetry(fn, attempt: attempt + 1);
+    } on HandshakeException {
+      _throwMaintenance();
+    }
+    throw const ApiException('Unexpected error');
+  }
+
+  Future<void> _delay(int attempt) =>
+      Future.delayed(Duration(milliseconds: AppApi.retryDelayMs * attempt));
+
+  Never _throwMaintenance() => throw const ApiException(
+        'The server is under maintenance. Please try again after some time.',
+      );
+
+  // ─────────────────────────────────────────────────────────
+  //  Response handling
+  // ─────────────────────────────────────────────────────────
+
+  dynamic _handleResponse(http.Response response) {
+    final dynamic data = _tryDecode(response.body);
+    if (response.statusCode >= 200 && response.statusCode < 300) return data;
+    final message = _extractMessage(data) ?? _defaultMessage(response.statusCode);
+    throw ApiException(message, statusCode: response.statusCode);
+  }
+
+  dynamic _tryDecode(String body) {
+    try {
+      return jsonDecode(body);
+    } catch (_) {
+      return body;
+    }
+  }
+
+  String? _extractMessage(dynamic data) {
+    if (data is Map) {
+      return (data['message'] ?? data['error'] ?? data['detail'])?.toString();
+    }
+    return null;
+  }
+
+  String _defaultMessage(int status) => switch (status) {
+        400 => 'Bad request. Please check your input.',
+        401 => 'Session expired. Please log in again.',
+        403 => 'You do not have permission to perform this action.',
+        404 => 'The requested resource was not found.',
+        408 => 'Request timed out. Please try again.',
+        429 => 'Too many requests. Please slow down.',
+        500 => 'Internal server error. Please try again later.',
+        502 => 'Bad gateway. Please try again later.',
+        503 => 'Service unavailable. Please try again later.',
+        _   => 'Unexpected error (HTTP $status).',
+      };
+
+  void dispose() {
+    _client?.close();
+    _client = null;
+  }
+}
+
+EOF
+
+    _dart "lib/core/network/api/api_endpoints.dart"; cat > "${B}/lib/core/network/api/api_endpoints.dart" << EOF
+// ─────────────────────────────────────────────────────────────
+//  ApiEndpoints — Every endpoint path in one place.
+//  Base URL is in AppApi.baseUrl — not here.
+// ─────────────────────────────────────────────────────────────
+abstract final class ApiEndpoints {
+  // ── Auth ──────────────────────────────────────────────────
+  static const String login     = '/auth/login';
+  static const String register  = '/auth/register';
+  static const String logout    = '/auth/logout';
+  static const String refresh   = '/auth/refresh';
+
+  // ── User ──────────────────────────────────────────────────
+  static const String profile   = '/user/profile';
+  static const String userSync  = '/api/users/sync';
+
+  // ── Settings ──────────────────────────────────────────────
+  static const String settings  = '/settings';
+  static const String adsStatus = '/api/settings/ads-status';
+
+  // ── Upload ────────────────────────────────────────────────
+  static const String upload    = '/upload';
+}
+EOF
+
     _dart "lib/core/network/interceptors/auth_interceptor.dart"
     _dart "lib/core/network/interceptors/logging_interceptor.dart"
   fi
@@ -2674,33 +2888,876 @@ EOF
   _yes "$F_SENTRY"        && _dart "lib/core/services/crash_reporting_service.dart"
   _yes "$F_REMOTE_CONFIG" && _dart "lib/core/services/remote_config_service.dart"
 
-  _dart "lib/core/theme/app_theme.dart"
-  _yes "$F_THEME" && _dart "lib/core/theme/light_theme.dart"
-  _yes "$F_THEME" && _dart "lib/core/theme/dark_theme.dart"
+if _yes "$F_FIREBASE_AUTH"; then
+  mkdir -p "${B}/lib/core/services/firebase"
 
-  _dart "lib/core/utils/extensions/context_ext.dart"
-  _dart "lib/core/utils/extensions/string_ext.dart"
-  _dart "lib/core/utils/extensions/date_time_ext.dart"
-  _dart "lib/core/utils/extensions/list_ext.dart"
+ _dart "lib/core/services/firebase/firebase_service.dart"; cat > "${B}/lib/core/services/firebase/firebase_service.dart" << EOF
+import 'package:firebase_core/firebase_core.dart';
+
+export 'firebase_auth_service.dart';
+export 'firebase_messaging_service.dart';
+
+class FirebaseService {
+  FirebaseService._();
+
+  static Future<void> initialize() async {
+    await Firebase.initializeApp(
+      // options: DefaultFirebaseOptions.currentPlatform, // uncomment after flutterfire configure
+    );
+  }
+}
+EOF
+
+ _dart "lib/core/services/firebase/firebase_auth_service.dart"; cat > "${B}/lib/core/services/firebase/firebase_auth_service.dart" << EOF
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:${PROJECT_NAME}/core/network/api/api_client.dart';
+import 'package:${PROJECT_NAME}/core/network/api/api_endpoints.dart';
+import 'package:${PROJECT_NAME}/data/models/user_model.dart';
+
+class AuthService {
+  // ── Firebase & Google ─────────────────────────────────────
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    serverClientId: '',
+    scopes: ['email', 'https://www.googleapis.com/auth/userinfo.profile'],
+  );
+
+  final ApiClient _apiClient = ApiClient();
+
+  // ── State ─────────────────────────────────────────────────
+  UserModel? _dbUser;
+
+  UserModel? get dbUser    => _dbUser;
+  int?       get dbUserId  => _dbUser?.id;
+  User?      get currentUser => _auth.currentUser;
+  bool       get isLoggedIn  => currentUser != null;
+
+  // ── Google Sign-In ────────────────────────────────────────
+  Future<User?> signInWithGoogle() async {
+    try {
+      final googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) return null;
+
+      final googleAuth = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final userCredential = await _auth.signInWithCredential(credential);
+      final user = userCredential.user;
+
+      if (user != null) await _syncUserWithBackend(user);
+
+      return user;
+    } catch (e) {
+      debugPrint('❌ signInWithGoogle: $e');
+      return null;
+    }
+  }
+
+  // ── Sign Out ──────────────────────────────────────────────
+  Future<void> signOut() async {
+    try {
+      await Future.wait([_googleSignIn.signOut(), _auth.signOut()]);
+      _dbUser = null;
+    } catch (e) {
+      debugPrint('❌ signOut: $e');
+    }
+  }
+
+  // ── Backend sync ──────────────────────────────────────────
+  Future<UserModel?> _syncUserWithBackend(User firebaseUser) async {
+    try {
+      final response = await _apiClient
+          .post(
+            ApiEndpoints.userSync,
+            body: {
+              'uid':         firebaseUser.uid,
+              'email':       firebaseUser.email,
+              'displayName': firebaseUser.displayName,
+              'photoURL':    firebaseUser.photoURL,
+              'provider':    'google',
+            },
+          )
+          .timeout(
+            const Duration(seconds: 5),
+            onTimeout: () {
+              debugPrint('⏱ syncUser timeout — uid: ${firebaseUser.uid}');
+              return null;
+            },
+          );
+
+      return _dbUser = _parseUser(response);
+    } catch (e) {
+      debugPrint('❌ _syncUserWithBackend: $e');
+      return null;
+    }
+  }
+
+  // ── Fetch DB user ─────────────────────────────────────────
+  Future<UserModel?> getDbUser(String firebaseUid) async {
+    try {
+      final response = await _apiClient
+          .get(ApiEndpoints.userByFirebaseUid(firebaseUid))
+          .timeout(
+            const Duration(seconds: 5),
+            onTimeout: () {
+              debugPrint('⏱ getDbUser timeout — uid: $firebaseUid');
+              return null;
+            },
+          );
+
+      return _dbUser = _parseUser(response);
+    } catch (e) {
+      debugPrint('❌ getDbUser: $e');
+      return null;
+    }
+  }
+
+  // ── Helpers ───────────────────────────────────────────────
+  UserModel? _parseUser(dynamic response) {
+    if (response is Map<String, dynamic>) return UserModel.fromJson(response);
+    return null;
+  }
+}
+
+EOF
+
+ _dart "lib/core/services/firebase/firebase_messaging_service.dart"; cat > "${B}/lib/core/services/firebase/firebase_messaging_service.dart" << EOF
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
+
+// ─────────────────────────────────────────────────────────────
+//  Background handler — must be top-level (required by iOS)
+// ─────────────────────────────────────────────────────────────
+@pragma('vm:entry-point')
+Future<void> handleBackgroundMessage(RemoteMessage message) async {
+  // Runs in a separate isolate — keep it minimal, no UI calls
+}
+
+// ─────────────────────────────────────────────────────────────
+//  FirebaseApi
+// ─────────────────────────────────────────────────────────────
+class FirebaseApi {
+  FirebaseApi._();
+  static final FirebaseApi instance = FirebaseApi._();
+
+  FirebaseMessaging get _fcm => FirebaseMessaging.instance;
+
+  // ── Init ─────────────────────────────────────────────────
+  Future<void> initialize() async {
+    await _fcm.setAutoInitEnabled(true);
+
+    // Must be registered before getToken() on iOS
+    FirebaseMessaging.onBackgroundMessage(handleBackgroundMessage);
+
+    await _requestPermission();
+    await _setupForegroundHandler();
+  }
+
+  // ── Permission ───────────────────────────────────────────
+  Future<void> _requestPermission() async {
+    await _fcm.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+  }
+
+  // ── Token ────────────────────────────────────────────────
+  Future<String?> getToken() => _fcm.getToken();
+
+  Stream<String> get onTokenRefresh => _fcm.onTokenRefresh;
+
+  // ── Topic ────────────────────────────────────────────────
+  Future<void> subscribeToTopic(String topic) =>
+      _fcm.subscribeToTopic(topic);
+
+  Future<void> unsubscribeFromTopic(String topic) =>
+      _fcm.unsubscribeFromTopic(topic);
+
+  // ── Foreground messages ──────────────────────────────────
+  Future<void> _setupForegroundHandler() async {
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      debugPrint('📩 [FG] ${message.notification?.title}: ${message.notification?.body}');
+    });
+
+    // App opened via notification (from background, not terminated)
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      debugPrint('📩 [OPENED] data: ${message.data}');
+    });
+  }
+
+  // ── Notification tapped while app was terminated ──────────
+  Future<RemoteMessage?> getInitialMessage() => _fcm.getInitialMessage();
+}
+
+EOF
+
+fi
+
+  _dart "lib/core/theme/app_theme.dart"; cat > "${B}/lib/core/theme/app_theme.dart" << EOF
+import 'package:flutter/material.dart';
+import 'package:${PROJECT_NAME}/core/theme/light_theme.dart';
+import 'package:${PROJECT_NAME}/core/theme/dark_theme.dart';
+
+class AppTheme {
+  static ThemeData get lightTheme => lightThemeData;
+  static ThemeData get darkTheme => darkThemeData;
+}
+EOF
+
+  _yes "$F_THEME" && _dart "lib/core/theme/light_theme.dart"; cat > "${B}/lib/core/theme/light_theme.dart" << EOF
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:${PROJECT_NAME}/core/constants/app_colors.dart';
+import 'package:${PROJECT_NAME}/core/utils/helpers/theme_helper.dart';
+
+// Source of truth for semantic colors
+const _scheme = AppColorScheme.light;
+
+ThemeData lightThemeData = ThemeData(
+  useMaterial3: true,
+  brightness: Brightness.light,
+  fontFamily: 'Poppins',
+
+  // Color Scheme
+  colorScheme: ColorScheme.light(
+    primary: _scheme.primary,
+    primaryContainer: _scheme.primaryLight,
+    secondary: _scheme.secondary,
+    secondaryContainer: AppColors.secondaryLight,
+    surface: _scheme.surface,
+    error: _scheme.error,
+    onPrimary: AppColors.textLight,
+    onSecondary: AppColors.textLight,
+    onSurface: _scheme.textPrimary,
+    onError: AppColors.textLight,
+  ),
+
+  // Scaffold
+  scaffoldBackgroundColor: _scheme.background,
+
+  // AppBar Theme
+  appBarTheme: AppBarTheme(
+    backgroundColor: _scheme.primary,
+    foregroundColor: AppColors.textLight,
+    elevation: 0,
+    centerTitle: true,
+    titleTextStyle: const TextStyle(
+      fontSize: 20,
+      fontWeight: FontWeight.bold,
+      color: AppColors.textLight,
+    ),
+    iconTheme: const IconThemeData(color: AppColors.textLight),
+    systemOverlayStyle: const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+    ),
+  ),
+
+  // Card Theme
+  cardTheme: CardThemeData(
+    color: _scheme.card,
+    elevation: 2,
+    shadowColor: _scheme.shadow,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  ),
+
+  // Elevated Button Theme
+  elevatedButtonTheme: ElevatedButtonThemeData(
+    style: ElevatedButton.styleFrom(
+      backgroundColor: _scheme.primary,
+      foregroundColor: AppColors.textLight,
+      elevation: 2,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+    ),
+  ),
+
+  // Text Button Theme
+  textButtonTheme: TextButtonThemeData(
+    style: TextButton.styleFrom(
+      foregroundColor: _scheme.primary,
+      textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+    ),
+  ),
+
+  // Outlined Button Theme
+  outlinedButtonTheme: OutlinedButtonThemeData(
+    style: OutlinedButton.styleFrom(
+      foregroundColor: _scheme.primary,
+      side: BorderSide(color: _scheme.primary),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ),
+  ),
+
+  // Input Decoration Theme
+  inputDecorationTheme: InputDecorationTheme(
+    filled: true,
+    fillColor: AppColors.grey100,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide.none,
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide.none,
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(color: _scheme.primary, width: 2),
+    ),
+    errorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(color: _scheme.error),
+    ),
+    hintStyle: TextStyle(color: _scheme.textSecondary),
+  ),
+
+  // Chip Theme
+  chipTheme: ChipThemeData(
+    backgroundColor: AppColors.grey200,
+    selectedColor: _scheme.primary,
+    labelStyle: TextStyle(color: _scheme.textPrimary),
+    secondaryLabelStyle: const TextStyle(color: AppColors.textLight),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+  ),
+
+  // Bottom Navigation Bar Theme
+  bottomNavigationBarTheme: BottomNavigationBarThemeData(
+    backgroundColor: AppColors.background,
+    selectedItemColor: _scheme.primary,
+    unselectedItemColor: _scheme.textSecondary,
+    type: BottomNavigationBarType.fixed,
+    elevation: 8,
+    selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
+  ),
+
+  // Divider Theme
+  dividerTheme: DividerThemeData(
+    color: _scheme.divider,
+    thickness: 1,
+    space: 1,
+  ),
+
+  // Text Theme
+  textTheme: TextTheme(
+    displayLarge: TextStyle(
+      fontSize: 32,
+      fontWeight: FontWeight.bold,
+      color: _scheme.textPrimary,
+    ),
+    displayMedium: TextStyle(
+      fontSize: 28,
+      fontWeight: FontWeight.bold,
+      color: _scheme.textPrimary,
+    ),
+    displaySmall: TextStyle(
+      fontSize: 24,
+      fontWeight: FontWeight.bold,
+      color: _scheme.textPrimary,
+    ),
+    headlineMedium: TextStyle(
+      fontSize: 20,
+      fontWeight: FontWeight.w600,
+      color: _scheme.textPrimary,
+    ),
+    headlineSmall: TextStyle(
+      fontSize: 18,
+      fontWeight: FontWeight.w600,
+      color: _scheme.textPrimary,
+    ),
+    titleLarge: TextStyle(
+      fontSize: 16,
+      fontWeight: FontWeight.w600,
+      color: _scheme.textPrimary,
+    ),
+    titleMedium: TextStyle(
+      fontSize: 14,
+      fontWeight: FontWeight.w500,
+      color: _scheme.textPrimary,
+    ),
+    bodyLarge: TextStyle(fontSize: 16, color: _scheme.textPrimary),
+    bodyMedium: TextStyle(fontSize: 14, color: _scheme.textSecondary),
+    bodySmall: TextStyle(fontSize: 12, color: _scheme.textSecondary),
+    labelLarge: TextStyle(
+      fontSize: 14,
+      fontWeight: FontWeight.w600,
+      color: _scheme.textPrimary,
+    ),
+  ),
+);
+
+EOF
+
+  _yes "$F_THEME" && _dart "lib/core/theme/dark_theme.dart"; cat > "${B}/lib/core/theme/dark_theme.dart" << EOF
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:${PROJECT_NAME}/core/constants/app_colors.dart';
+import 'package:${PROJECT_NAME}/core/utils/helpers/theme_helper.dart';
+
+// Source of truth for semantic colors
+const _scheme = AppColorScheme.dark;
+
+ThemeData darkThemeData = ThemeData(
+  useMaterial3: true,
+  brightness: Brightness.dark,
+  fontFamily: 'Poppins',
+
+  // Color Scheme
+  colorScheme: ColorScheme.dark(
+    primary: _scheme.primary,
+    primaryContainer: _scheme.primaryDark,
+    secondary: _scheme.secondary,
+    secondaryContainer: AppColors.secondaryLight,
+    surface: _scheme.surface,
+    error: _scheme.error,
+    onPrimary: AppColors.textLight,
+    onSecondary: AppColors.textLight,
+    onSurface: _scheme.textPrimary,
+    onError: AppColors.textLight,
+  ),
+
+  // Scaffold
+  scaffoldBackgroundColor: _scheme.background,
+
+  // AppBar Theme
+  appBarTheme: AppBarTheme(
+    backgroundColor: _scheme.surface,
+    foregroundColor: AppColors.textLight,
+    elevation: 0,
+    centerTitle: true,
+    titleTextStyle: const TextStyle(
+      fontSize: 20,
+      fontWeight: FontWeight.bold,
+      color: AppColors.textLight,
+    ),
+    iconTheme: const IconThemeData(color: AppColors.textLight),
+    systemOverlayStyle: const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+    ),
+  ),
+
+  // Card Theme
+  cardTheme: CardThemeData(
+    color: _scheme.card,
+    elevation: 2,
+    shadowColor: _scheme.shadow,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  ),
+
+  // Elevated Button Theme
+  elevatedButtonTheme: ElevatedButtonThemeData(
+    style: ElevatedButton.styleFrom(
+      backgroundColor: _scheme.primary,
+      foregroundColor: AppColors.textLight,
+      elevation: 2,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+    ),
+  ),
+
+  // Text Button Theme
+  textButtonTheme: TextButtonThemeData(
+    style: TextButton.styleFrom(
+      foregroundColor: _scheme.primary,
+      textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+    ),
+  ),
+
+  // Outlined Button Theme
+  outlinedButtonTheme: OutlinedButtonThemeData(
+    style: OutlinedButton.styleFrom(
+      foregroundColor: _scheme.primary,
+      side: BorderSide(color: _scheme.primary),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ),
+  ),
+
+  // Input Decoration Theme
+  inputDecorationTheme: InputDecorationTheme(
+    filled: true,
+    fillColor: _scheme.surface,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide.none,
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide.none,
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(color: _scheme.primary, width: 2),
+    ),
+    errorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(color: _scheme.error),
+    ),
+    hintStyle: TextStyle(color: _scheme.textSecondary),
+  ),
+
+  // Chip Theme
+  chipTheme: ChipThemeData(
+    backgroundColor: _scheme.surface,
+    selectedColor: _scheme.primary,
+    labelStyle: TextStyle(color: _scheme.textPrimary),
+    secondaryLabelStyle: const TextStyle(color: AppColors.textLight),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+  ),
+
+  // Bottom Navigation Bar Theme
+  bottomNavigationBarTheme: BottomNavigationBarThemeData(
+    backgroundColor: _scheme.surface,
+    selectedItemColor: _scheme.primary,
+    unselectedItemColor: _scheme.textSecondary,
+    type: BottomNavigationBarType.fixed,
+    elevation: 8,
+    selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
+  ),
+
+  // Divider Theme
+  dividerTheme: DividerThemeData(
+    color: _scheme.divider,
+    thickness: 1,
+    space: 1,
+  ),
+
+  // Text Theme
+  textTheme: TextTheme(
+    displayLarge: const TextStyle(
+      fontSize: 32,
+      fontWeight: FontWeight.bold,
+      color: AppColors.textLight,
+    ),
+    displayMedium: const TextStyle(
+      fontSize: 28,
+      fontWeight: FontWeight.bold,
+      color: AppColors.textLight,
+    ),
+    displaySmall: const TextStyle(
+      fontSize: 24,
+      fontWeight: FontWeight.bold,
+      color: AppColors.textLight,
+    ),
+    headlineMedium: const TextStyle(
+      fontSize: 20,
+      fontWeight: FontWeight.w600,
+      color: AppColors.textLight,
+    ),
+    headlineSmall: const TextStyle(
+      fontSize: 18,
+      fontWeight: FontWeight.w600,
+      color: AppColors.textLight,
+    ),
+    titleLarge: const TextStyle(
+      fontSize: 16,
+      fontWeight: FontWeight.w600,
+      color: AppColors.textLight,
+    ),
+    titleMedium: const TextStyle(
+      fontSize: 14,
+      fontWeight: FontWeight.w500,
+      color: AppColors.textLight,
+    ),
+    bodyLarge: const TextStyle(fontSize: 16, color: AppColors.textLight),
+    bodyMedium: TextStyle(fontSize: 14, color: _scheme.textSecondary),
+    bodySmall: TextStyle(fontSize: 12, color: _scheme.textSecondary),
+    labelLarge: const TextStyle(
+      fontSize: 14,
+      fontWeight: FontWeight.w600,
+      color: AppColors.textLight,
+    ),
+  ),
+);
+EOF
+
+# ============================================================
+# 8. CORE — Extensions
+# ============================================================
+  _dart "lib/core/utils/extensions/context_extensions.dart";cat > "${B}/lib/core/utils/extensions/context_extensions.dart" << 'EOF'
+import 'package:flutter/material.dart';
+
+extension ContextExtensions on BuildContext {
+  ThemeData get theme => Theme.of(this);
+  ColorScheme get colorScheme => Theme.of(this).colorScheme;
+  TextTheme get textTheme => Theme.of(this).textTheme;
+  MediaQueryData get mediaQuery => MediaQuery.of(this);
+  Size get screenSize => MediaQuery.of(this).size;
+  double get screenWidth => MediaQuery.of(this).size.width;
+  double get screenHeight => MediaQuery.of(this).size.height;
+  bool get isDarkMode => Theme.of(this).brightness == Brightness.dark;
+
+  void showSnackBar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(this).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? colorScheme.error : colorScheme.primary,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void pop<T>([T? result]) => Navigator.of(this).pop(result);
+
+  Future<T?> push<T>(Widget page) => Navigator.of(this).push<T>(
+        MaterialPageRoute(builder: (_) => page),
+      );
+}
+EOF
+
+  _dart "lib/core/utils/extensions/string_extensions.dart";cat > "${B}/lib/core/utils/extensions/string_extensions.dart" << 'EOF'
+extension StringExtensions on String {
+  bool get isValidEmail =>
+      RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+          .hasMatch(this);
+
+  bool get isValidPhone =>
+      RegExp(r'^\+?[0-9]{10,13}$').hasMatch(this);
+
+  bool get isValidPassword => length >= 8;
+
+  String get capitalize =>
+      isEmpty ? this : '${this[0].toUpperCase()}${substring(1)}';
+
+  String get titleCase => split(' ').map((w) => w.capitalize).join(' ');
+
+  String? get nullIfEmpty => isEmpty ? null : this;
+}
+
+extension NullableStringExtensions on String? {
+  bool get isNullOrEmpty => this == null || this!.isEmpty;
+  String get orEmpty => this ?? '';
+}
+EOF
+
+
+#   _dart "lib/core/utils/extensions/date_time_extensions.dart";cat > "${B}/lib/core/utils/extensions/date_time_extensions.dart" << 'EOF'
+# import 'package:intl/intl.dart';
+
+# extension DateExtensions on DateTime {
+#   String get formatted => DateFormat('dd MMM yyyy').format(this);
+#   String get formattedWithTime => DateFormat('dd MMM yyyy, hh:mm a').format(this);
+#   String get timeOnly => DateFormat('hh:mm a').format(this);
+#   String get monthYear => DateFormat('MMMM yyyy').format(this);
+#   bool get isToday {
+#     final now = DateTime.now();
+#     return year == now.year && month == now.month && day == now.day;
+#   }
+#   bool get isYesterday {
+#     final yesterday = DateTime.now().subtract(const Duration(days: 1));
+#     return year == yesterday.year &&
+#         month == yesterday.month &&
+#         day == yesterday.day;
+#   }
+# }
+# EOF
+
   _dart "lib/core/utils/formatters/date_formatter.dart"
   _dart "lib/core/utils/formatters/number_formatter.dart"
-  _dart "lib/core/utils/validators/email_validator.dart"
-  _dart "lib/core/utils/validators/input_validators.dart"
-  _dart "lib/core/utils/helpers/helper.dart"
-  _dart "lib/core/utils/helpers/permission_helper.dart"
 
-  _yes "$F_DI" && _dart "lib/core/di/injection_container.dart"
-  _yes "$F_DI" && _dart "lib/core/di/injection_container.config.dart"
+  _dart "lib/core/utils/validators/validators.dart";cat > "${B}/lib/core/utils/validators/validators.dart" << 'EOF'
+class Validators {
+  Validators._();
+
+  static String? email(String? value) {
+    if (value == null || value.isEmpty) return 'Email is required';
+    final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
+    if (!emailRegex.hasMatch(value)) return 'Enter a valid email';
+    return null;
+  }
+
+  static String? password(String? value) {
+    if (value == null || value.isEmpty) return 'Password is required';
+    if (value.length < 8) return 'Password must be at least 8 characters';
+    return null;
+  }
+
+  static String? required(String? value, [String fieldName = 'Field']) {
+    if (value == null || value.trim().isEmpty) return '$fieldName is required';
+    return null;
+  }
+
+  static String? phone(String? value) {
+    if (value == null || value.isEmpty) return 'Phone number is required';
+    final phoneRegex = RegExp(r'^\+?[0-9]{10,13}$');
+    if (!phoneRegex.hasMatch(value)) return 'Enter a valid phone number';
+    return null;
+  }
+
+  static String? confirmPassword(String? value, String password) {
+    if (value == null || value.isEmpty) return 'Please confirm your password';
+    if (value != password) return 'Passwords do not match';
+    return null;
+  }
+}
+EOF
+
+  _dart "lib/core/utils/helpers/theme_helper.dart";cat > "${B}/lib/core/utils/helpers/theme_helper.dart" << EOF
+// ─────────────────────────────────────────────
+// 3. THEME HELPER  –  return correct token
+//    based on current brightness (light/dark mode).
+//    Usage:  AppColorScheme.of(context).surface
+// ─────────────────────────────────────────────
+import 'package:flutter/material.dart';
+import 'package:${PROJECT_NAME}/core/constants/app_colors.dart';
+
+class AppColorScheme {
+  const AppColorScheme._({required this.brightness});
+
+  static const light = AppColorScheme._(brightness: Brightness.light);
+  static const dark = AppColorScheme._(brightness: Brightness.dark);
+
+  factory AppColorScheme.of(BuildContext context) {
+    return AppColorScheme._(
+      brightness: Theme.of(context).brightness,
+    );
+  }
+
+  final Brightness brightness;
+  bool get _isDark => brightness == Brightness.dark;
+
+  Color get background  => _isDark ? AppColors.backgroundDark  : AppColors.background;
+  Color get surface     => _isDark ? AppColors.surfaceDark      : AppColors.surface;
+  Color get card        => _isDark ? AppColors.cardDark         : AppColors.card;
+
+  Color get textPrimary   => _isDark ? AppColors.textPrimaryDark   : AppColors.textPrimary;
+  Color get textSecondary => _isDark ? AppColors.textSecondaryDark : AppColors.textSecondary;
+  Color get textDisabled  => _isDark ? AppColors.textDisabledDark  : AppColors.textDisabled;
+
+  Color get border   => _isDark ? AppColors.borderDark  : AppColors.border;
+  Color get divider  => _isDark ? AppColors.dividerDark : AppColors.divider;
+  Color get shadow   => _isDark ? AppColors.shadowDark  : AppColors.shadow;
+  Color get glass    => _isDark ? AppColors.glassDark   : AppColors.glassLight;
+
+  // Semantic
+  Color get primary       => AppColors.primary;
+  Color get primaryLight  => AppColors.primaryLight;
+  Color get primaryDark   => AppColors.primaryDark;
+  Color get secondary     => AppColors.secondary;
+  Color get success       => AppColors.success;
+  Color get warning       => AppColors.warning;
+  Color get error         => AppColors.error;
+  Color get info          => AppColors.info;
+}
+EOF
+
+  _dart "lib/core/utils/helpers/helper.dart";cat > "${B}/lib/core/utils/helpers/helper.dart" << 'EOF'
+// ─────────────────────────────────────────────────────────────
+// helper barrel export.
+// ─────────────────────────────────────────────────────────────
+
+export 'admob_helper.dart';
+EOF
+
+  _dart "lib/core/utils/helpers/admob_helper.dart";cat > "${B}/lib/core/utils/helpers/admob_helper.dart" << 'EOF'
+import 'dart:io';
+
+// all this unit Id is tesing id
+// Ad format	Demo ad unit ID
+// App Open	              ca-app-pub-3940256099942544/9257395921
+// Adaptive Banner	      ca-app-pub-3940256099942544/9214589741
+// Fixed Size Banner	    ca-app-pub-3940256099942544/6300978111
+// Interstitial	          ca-app-pub-3940256099942544/1033173712
+// Rewarded Ads	          ca-app-pub-3940256099942544/5224354917
+// Rewarded Interstitial	ca-app-pub-3940256099942544/5354046379
+// Native	                ca-app-pub-3940256099942544/2247696110
+// Native Video	          ca-app-pub-3940256099942544/1044960115
+
+class AdHelper {
+  static String get bannerAdUnitId {
+    if (Platform.isAndroid) {
+      // Adaptive Banner	      ca-app-pub-3940256099942544/9214589741
+      // Fixed Size Banner	    ca-app-pub-3940256099942544/6300978111
+      return 'ca-app-pub-3940256099942544/9214589741';
+    } else {
+      throw UnsupportedError('Unsupported platform');
+    }
+  }
+
+  static String get interstitialAdUnitId {
+    if (Platform.isAndroid) {
+      // Interstitial	          ca-app-pub-3940256099942544/1033173712
+      return 'ca-app-pub-3940256099942544/1033173712';
+    } else {
+      throw UnsupportedError('Unsupported platform');
+    }
+  }
+
+  static String get rewardedAdUnitId {
+    if (Platform.isAndroid) {
+      // Rewarded Ads	          ca-app-pub-3940256099942544/5224354917
+      return 'ca-app-pub-3940256099942544/5224354917';
+    } else {
+      throw UnsupportedError('Unsupported platform');
+    }
+  }
+}
+EOF
+
+  _yes "$F_DI" &&  _dart "lib/core/di/injection_container.dart"; cat > "${B}/lib/core/di/injection_container.dart" << 'EOF'
+import 'package:get_it/get_it.dart';
+import 'package:injectable/injectable.dart';
+
+import 'injection_container.config.dart';
+
+final GetIt getIt = GetIt.instance;
+
+@InjectableInit(
+  initializerName: 'init',
+  preferRelativeImports: true,
+  asExtension: true,
+)
+Future<void> configureDependencies() async => getIt.init();
+EOF
+
+  _yes "$F_DI" &&  _dart "lib/core/di/injection_container.config.dart"; cat > "${B}/lib/core/di/injection_container.config.dart" << 'EOF'
+// GENERATED CODE - DO NOT MODIFY BY HAND
+
+// **************************************************************************
+// InjectableConfigGenerator
+// **************************************************************************
+
+// ignore_for_file: type=lint
+// coverage:ignore-file
+
+// ignore_for_file: no_leading_underscores_for_library_prefixes
+import 'package:get_it/get_it.dart' as _i174;
+import 'package:injectable/injectable.dart' as _i526;
+
+extension GetItInjectableX on _i174.GetIt {
+  Future<_i174.GetIt> init({
+    String? environment,
+    _i526.EnvironmentFilter? environmentFilter,
+  }) async {
+    final gh = _i526.GetItHelper(this, environment, environmentFilter);
+    // TODO: Register your dependencies here after running build_runner
+    return this;
+  }
+}
+EOF
+
+
 
   if _yes "$F_LOGGING"; then
     _dart "lib/core/logger/app_logger.dart"
     _dart "lib/core/logger/log_printer.dart"
   fi
 
-  _dart "lib/core/resources/color_manager.dart"
-  _dart "lib/core/resources/font_manager.dart"
-  _dart "lib/core/resources/image_manager.dart"
-  _dart "lib/core/resources/value_manager.dart"
+  # _dart "lib/core/resources/color_manager.dart"
 
   _dart "lib/features/auth/data/datasources/auth_local_datasource.dart"
   _dart "lib/features/auth/data/datasources/auth_remote_datasource.dart"
@@ -4448,8 +5505,8 @@ EOF
 # DO NOT commit this file.
 #
 # Run `make setup-local` to auto-generate from environment variables:
-#   export ANDROID_HOME=/home/rohit/Android/Sdk
-#   export FLUTTER_ROOT=/home/rohit/flutter
+#   export ANDROID_HOME=/home/username/Android/Sdk
+#   export FLUTTER_ROOT=/home/username/flutter
 #   make setup-local
 #
 # Or fill in the values manually below:
@@ -4480,8 +5537,8 @@ EOF
   echo ""
 
   echo -e "${BOLD}${YELLOW}  ⚡ Next steps:${RESET}"
-  echo -e "  ${GREEN}export ANDROID_HOME=/home/rohit/Android/Sdk${RESET}"
-  echo -e "  ${GREEN}export FLUTTER_ROOT=/home/rohit/flutter${RESET}"
+  echo -e "  ${GREEN}export ANDROID_HOME=/home/username/Android/Sdk${RESET}"
+  echo -e "  ${GREEN}export FLUTTER_ROOT=/home/username/flutter${RESET}"
   echo -e "  ${GREEN}make setup-local${RESET}"
   echo -e "  ${GREEN}flutter pub get${RESET}"
   $_NEEDS_BUILD_RUNNER && echo -e "  ${GREEN}flutter pub run build_runner build --delete-conflicting-outputs${RESET}"
