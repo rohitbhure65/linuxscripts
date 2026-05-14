@@ -3424,6 +3424,30 @@ class InAppReviewService {
 
 EOF
 
+_dart "lib/core/services/service.dart"; cat > "${B}/lib/core/services/service.dart" << EOF
+// Core Services Barrel Export
+// This file exports all services for easy importing
+
+// ===== Firebase Services =====
+export 'firebase/firebase_auth_service.dart';
+export 'firebase/firebase_messaging_service.dart';
+export 'firebase/firebase_service.dart';
+
+// ===== Core Services =====
+export 'admob_service.dart';
+export 'analytics_service.dart';
+export 'connectivity_service.dart';
+export 'crash_reporting_service.dart';
+export 'in_app_review_service.dart';
+export 'local_notification_service.dart';
+export 'navigation_service.dart';
+export 'notification_service.dart';
+export 'permission_service.dart';
+export 'remote_config_service.dart';
+export 'share_service.dart';
+export 'storage_service.dart';
+export 'update_service.dart';
+EOF
 
 # ── update ────────────────────────────────────────────
 _dart "lib/core/services/update_service.dart"; cat > "${B}/lib/core/services/update_service.dart" << EOF
