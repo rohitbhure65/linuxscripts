@@ -675,7 +675,6 @@ mkflutter() {
     "${B}/lib/core/errors" \
     "${B}/lib/core/network/api" \
     "${B}/lib/core/network/interceptors" \
-    "${B}/lib/core/network/connectivity" \
     "${B}/lib/core/cache" \
     "${B}/lib/core/services" \
     "${B}/lib/core/theme" \
@@ -747,7 +746,7 @@ mkflutter() {
   ( _yes "$F_GOROUTER" || _yes "$F_AUTOROUTE" ) && mkdir -p "${B}/lib/routes/guards"
 
   mkdir -p "${B}/lib/config"
-  _yes "$F_FLAVORS" && mkdir -p "${B}/lib/config/flavors"
+  # _yes "$F_FLAVORS" && mkdir -p "${B}/lib/config/flavors"
 
   _yes "$F_UNIT_TEST" && mkdir -p \
     "${B}/test/unit/features/auth" \
@@ -4405,6 +4404,7 @@ EOF
 // ─────────────────────────────────────────────────────────────
 
 export 'admob_helper.dart';
+export 'theme_helper.dart';
 EOF
 
   _dart "lib/core/utils/helpers/admob_helper.dart";cat > "${B}/lib/core/utils/helpers/admob_helper.dart" << 'EOF'
@@ -4618,7 +4618,6 @@ EOF
   _dart "lib/shared/mixins/validation_mixin.dart"
   _dart "lib/shared/mixins/loading_mixin.dart"
 
-  _dart "lib/routes/app_routes.dart"
   _dart "lib/routes/app_pages.dart"
   if _yes "$F_GOROUTER" || _yes "$F_AUTOROUTE"; then
     _dart "lib/routes/guards/auth_guard.dart"
