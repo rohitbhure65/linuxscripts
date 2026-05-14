@@ -387,16 +387,16 @@ mkflutter() {
   _dep()  { [[ -n "$1" ]] && _DEPS_MAIN+=("$1"); }
   _devdep() { [[ -n "$1" ]] && _DEPS_DEV+=("$1"); }
 
-  # ── State Management ─────────────────────────────────────────────
+# ── State Management ─────────────────────────────────────────────
   _dep ""
   _dep "  # ------- State Management --------"
   case "$SM_CHOICE" in
-    1) _dep "  flutter_bloc: ^8.1.3 # State management library"
-       _dep "  equatable: ^2.0.5 # Value equality for objects" ;;
-    2) _dep "  flutter_riverpod: ^2.4.9 # Reactive caching and data-binding"
-       _dep "  riverpod_annotation: ^2.3.3 # Annotations for Riverpod" ;;
-    3) _dep "  get: ^4.6.6 # Route, state, and dependency management" ;;
-    4) _dep "  provider: ^6.1.1 # Dependency injection and state management" ;;
+    1) _dep "  flutter_bloc: ^9.1.0 # State management library"
+       _dep "  equatable: ^2.0.7 # Value equality for objects" ;;
+    2) _dep "  flutter_riverpod: ^2.6.1 # Reactive caching and data-binding"
+       _dep "  riverpod_annotation: ^2.6.1 # Annotations for Riverpod" ;;
+    3) _dep "  get: ^4.7.2 # Route, state, and dependency management" ;;
+    4) _dep "  provider: ^6.1.2 # Dependency injection and state management" ;;
   esac
 
   # ── Network ──────────────────────────────────────────────────────
@@ -405,11 +405,11 @@ mkflutter() {
     _dep "  # ------- Network --------"
   fi
   if [[ "$API_CHOICE" == "1" || "$API_CHOICE" == "5" ]]; then
-    _dep "  dio: ^5.4.0 # Powerful HTTP client for API calls"
-    _dep "  retrofit: ^4.0.3 # Dio client code generator for APIs"
+    _dep "  dio: ^5.9.0 # Powerful HTTP client for API calls"
+    _dep "  retrofit: ^4.4.1 # Dio client code generator for APIs"
   fi
-  [[ "$API_CHOICE" == "2" ]] && _dep "  http: ^1.1.0 # Basic HTTP client"
-  [[ "$API_CHOICE" == "4" ]] && _dep "  graphql_flutter: ^5.1.2 # GraphQL client"
+  [[ "$API_CHOICE" == "2" ]] && _dep "  http: ^1.3.0 # Basic HTTP client"
+  [[ "$API_CHOICE" == "4" ]] && _dep "  graphql_flutter: ^5.2.0 # GraphQL client"
 
   # ── Local Storage ────────────────────────────────────────────────
   if [[ "$STORAGE_CHOICE" != "5" ]]; then
@@ -417,11 +417,12 @@ mkflutter() {
     _dep "  # ------- Local Storage --------"
   fi
   case "$STORAGE_CHOICE" in
-    1) _dep "  hive: ^2.2.3 # Lightweight NoSQL local database"
-       _dep "  hive_flutter: ^1.1.0 # Hive extension for Flutter" ;;
-    2) _dep "  shared_preferences: ^2.2.2 # Local key-value storage" ;;
-    3) _dep "  sqflite: ^2.3.0 # SQLite plugin for local database"
-       _dep "  path: ^1.8.3 # Path manipulation for database" ;;
+    # NOTE: hive + hive_flutter abandoned (3 yrs). Using hive_ce (Community Edition) — drop-in replacement, same API.
+    1) _dep "  hive_ce: ^2.10.1 # Lightweight NoSQL local database (Community Edition)"
+       _dep "  hive_ce_flutter: ^2.2.0 # Hive CE extension for Flutter" ;;
+    2) _dep "  shared_preferences: ^2.5.3 # Local key-value storage" ;;
+    3) _dep "  sqflite: ^2.4.2 # SQLite plugin for local database"
+       _dep "  path: ^1.9.1 # Path manipulation for database" ;;
     4) _dep "  isar: ^3.1.0 # Super fast NoSQL database"
        _dep "  isar_flutter_libs: ^3.1.0 # Core binaries for Isar" ;;
   esac
@@ -434,52 +435,52 @@ mkflutter() {
 
   $_NEEDS_FB_CORE && _dep ""
   $_NEEDS_FB_CORE && _dep "  # ------- Firebase --------"
-  $_NEEDS_FB_CORE && _dep "  firebase_core: ^2.24.2 # Required for any Firebase service"
-  _yes "$F_FIREBASE_AUTH"    && _dep "  firebase_auth: ^4.16.0 # User authentication (Login/Signup)"
-  _yes "$F_FIRESTORE"        && _dep "  cloud_firestore: ^4.15.5 # Firebase NoSQL database"
-  _yes "$F_FIREBASE_STORAGE" && _dep "  firebase_storage: ^11.6.5 # Firebase cloud file storage"
-  _yes "$F_CRASHLYTICS"      && _dep "  firebase_crashlytics: ^3.4.15 # App crash tracking"
-  _yes "$F_ANALYTICS"        && _dep "  firebase_analytics: ^10.8.5 # User tracking & events analytics"
-  _yes "$F_REMOTE_CONFIG"    && _dep "  firebase_remote_config: ^4.3.15 # Update app without app store"
-  _yes "$F_PUSH"             && _dep "  firebase_messaging: ^14.7.15 # Push notifications"
+  $_NEEDS_FB_CORE && _dep "  firebase_core: ^3.12.1 # Required for any Firebase service"
+  _yes "$F_FIREBASE_AUTH"    && _dep "  firebase_auth: ^5.5.0 # User authentication (Login/Signup)"
+  _yes "$F_FIRESTORE"        && _dep "  cloud_firestore: ^5.6.0 # Firebase NoSQL database"
+  _yes "$F_FIREBASE_STORAGE" && _dep "  firebase_storage: ^12.4.0 # Firebase cloud file storage"
+  _yes "$F_CRASHLYTICS"      && _dep "  firebase_crashlytics: ^4.3.0 # App crash tracking"
+  _yes "$F_ANALYTICS"        && _dep "  firebase_analytics: ^11.4.0 # User tracking & events analytics"
+  _yes "$F_REMOTE_CONFIG"    && _dep "  firebase_remote_config: ^5.3.0 # Update app without app store"
+  _yes "$F_PUSH"             && _dep "  firebase_messaging: ^15.2.0 # Push notifications"
 
   # ── Auth ─────────────────────────────────────────────────────────
   if _yes "$F_OAUTH" || _yes "$F_BIOMETRIC"; then
     _dep ""
     _dep "  # ------- Auth --------"
   fi
-  _yes "$F_OAUTH"     && _dep "  google_sign_in: ^6.2.1 # Google login integration"
-  _yes "$F_BIOMETRIC" && _dep "  local_auth: ^2.1.7 # Fingerprint & Face ID login"
+  _yes "$F_OAUTH"     && _dep "  google_sign_in: ^6.2.2 # Google login integration"
+  _yes "$F_BIOMETRIC" && _dep "  local_auth: ^2.3.0 # Fingerprint & Face ID login"
 
   # ── Notifications ────────────────────────────────────────────────
   if _yes "$F_LOCAL_NOTIF"; then
     _dep ""
     _dep "  # ------- Notifications --------"
   fi
-  _yes "$F_LOCAL_NOTIF" && _dep "  flutter_local_notifications: ^16.3.0 # On-device notifications"
+  _yes "$F_LOCAL_NOTIF" && _dep "  flutter_local_notifications: ^18.0.1 # On-device notifications"
 
   # ── UI/UX ────────────────────────────────────────────────────────
   if _yes "$F_SPLASH" || _yes "$F_L10N"; then
     _dep ""
     _dep "  # ------- UI/UX --------"
   fi
-  _yes "$F_SPLASH" && _dep "  flutter_native_splash: ^2.3.8 # App launch screen handler"
-  _yes "$F_L10N"   && _dep "  easy_localization: ^3.0.3 # Multi-language support"
+  _yes "$F_SPLASH" && _dep "  flutter_native_splash: ^2.4.3 # App launch screen handler"
+  _yes "$F_L10N"   && _dep "  easy_localization: ^3.0.7 # Multi-language support"
 
   # ── Routing ──────────────────────────────────────────────────────
-  if _yes "$F_GOROUTER" || _yes "$F_AUTOROUTE"; then
+  # NOTE: auto_route removed — conflicts with go_router and adds unnecessary codegen overhead.
+  if _yes "$F_GOROUTER"; then
     _dep ""
     _dep "  # ------- Routing --------"
+    _dep "  go_router: ^14.8.0 # Declarative routing/navigation"
   fi
-  _yes "$F_GOROUTER"  && _dep "  go_router: ^13.1.0 # Declarative routing/navigation"
-  _yes "$F_AUTOROUTE" && _dep "  auto_route: ^7.8.4 # Code generated routing"
 
   # ── DI ───────────────────────────────────────────────────────────
   if _yes "$F_DI"; then
     _dep ""
     _dep "  # ------- Dependency Injection --------"
-    _dep "  get_it: ^7.6.7 # Dependency injection (Service Locator)"
-    _dep "  injectable: ^2.3.2 # Code generator for get_it"
+    _dep "  get_it: ^8.0.3 # Dependency injection (Service Locator)"
+    _dep "  injectable: ^2.5.0 # Code generator for get_it"
   fi
 
   # ── Media ────────────────────────────────────────────────────────
@@ -487,14 +488,14 @@ mkflutter() {
     _dep ""
     _dep "  # ------- Media --------"
   fi
-  _yes "$F_IMAGE_PICKER" && _dep "  image_picker: ^1.0.7 # Pick images from gallery or camera"
-  _yes "$F_FILE_PICKER"  && _dep "  file_picker: ^6.1.1 # Select documents & files"
+  _yes "$F_IMAGE_PICKER" && _dep "  image_picker: ^1.1.2 # Pick images from gallery or camera"
+  _yes "$F_FILE_PICKER"  && _dep "  file_picker: ^8.3.4 # Select documents & files"
   if _yes "$F_VIDEO"; then
-    _dep "  video_player: ^2.8.2 # Low-level video playing"
-    _dep "  chewie: ^1.7.4 # Advanced video player UI"
+    _dep "  video_player: ^2.9.2 # Low-level video playing"
+    _dep "  chewie: ^1.8.5 # Advanced video player UI"
   fi
-  _yes "$F_CAMERA" && _dep "  camera: ^0.10.5+9 # Device camera controls"
-  _yes "$F_PDF"    && _dep "  flutter_pdfview: ^1.3.2 # Show PDF files inside app"
+  _yes "$F_CAMERA" && _dep "  camera: ^0.11.0+2 # Device camera controls"
+  _yes "$F_PDF"    && _dep "  flutter_pdfview: ^1.4.0 # Show PDF files inside app"
 
   # ── Maps / Location ──────────────────────────────────────────────
   if _yes "$F_LOCATION" || _yes "$F_MAPS"; then
@@ -502,78 +503,93 @@ mkflutter() {
     _dep "  # ------- Maps & Location --------"
   fi
   if _yes "$F_LOCATION"; then
-    _dep "  geolocator: ^11.0.0 # Fetch current GPS location"
+    _dep "  geolocator: ^13.0.2 # Fetch current GPS location"
     _dep "  geocoding: ^3.0.0 # Convert coordinates to addresses"
   fi
-  _yes "$F_MAPS" && _dep "  google_maps_flutter: ^2.5.3 # Google Maps integration"
+  _yes "$F_MAPS" && _dep "  google_maps_flutter: ^2.10.0 # Google Maps integration"
 
   # ── Device ───────────────────────────────────────────────────────
   if _yes "$F_CONTACTS" || _yes "$F_QR" || _yes "$F_BLUETOOTH" || _yes "$F_DEEPLINK" || _yes "$F_SHARE" || _yes "$F_CONNECTIVITY" || _yes "$F_PERMISSIONS"; then
     _dep ""
     _dep "  # ------- Device --------"
   fi
-  _yes "$F_CONTACTS"     && _dep "  flutter_contacts: ^1.1.7+1 # Read/write phone contacts"
-  _yes "$F_QR"           && _dep "  mobile_scanner: ^3.5.5 # Scan QR codes and barcodes"
-  _yes "$F_BLUETOOTH"    && _dep "  flutter_blue_plus: ^1.29.5 # Bluetooth Low Energy (BLE)"
-  _yes "$F_DEEPLINK"     && _dep "  app_links: ^5.0.0 # Deep linking (handle URLs opening app)"
-  _yes "$F_SHARE"        && _dep "  share_plus: ^7.2.2 # Native share dialog"
-  _yes "$F_CONNECTIVITY" && _dep "  connectivity_plus: ^5.0.2 # Check if connected to internet"
-  _yes "$F_PERMISSIONS"  && _dep "  permission_handler: ^11.2.0 # Request camera, storage, etc permissions"
+  _yes "$F_CONTACTS"     && _dep "  flutter_contacts: ^1.1.8 # Read/write phone contacts"
+  _yes "$F_QR"           && _dep "  mobile_scanner: ^6.0.2 # Scan QR codes and barcodes"
+  _yes "$F_BLUETOOTH"    && _dep "  flutter_blue_plus: ^1.35.0 # Bluetooth Low Energy (BLE)"
+  _yes "$F_DEEPLINK"     && _dep "  app_links: ^6.3.2 # Deep linking (handle URLs opening app)"
+  _yes "$F_SHARE"        && _dep "  share_plus: ^10.1.2 # Native share dialog"
+  _yes "$F_CONNECTIVITY" && _dep "  connectivity_plus: ^6.1.1 # Check if connected to internet"
+  _yes "$F_PERMISSIONS"  && _dep "  permission_handler: ^11.3.1 # Request camera, storage, etc permissions"
 
   # ── Payments ─────────────────────────────────────────────────────
   if _yes "$F_PAYMENT" || _yes "$F_IAP"; then
     _dep ""
     _dep "  # ------- Payments --------"
   fi
-  _yes "$F_PAYMENT" && _dep "  razorpay_flutter: ^1.3.6 # Razorpay payment gateway"
-  _yes "$F_IAP"     && _dep "  in_app_purchase: ^3.1.13 # Store billing (IAP)"
+  _yes "$F_PAYMENT" && _dep "  razorpay_flutter: ^1.4.0 # Razorpay payment gateway"
+  _yes "$F_IAP"     && _dep "  in_app_purchase: ^3.2.0 # Store billing (IAP)"
 
   # ── Data ─────────────────────────────────────────────────────────
   if _yes "$F_CHARTS" || _yes "$F_EXCEL" || _yes "$F_PDF_GEN" || _yes "$F_QR_GEN"; then
     _dep ""
     _dep "  # ------- Data & Utilities --------"
   fi
-  _yes "$F_CHARTS"  && _dep "  fl_chart: ^0.66.2 # Drawing interactive charts"
-  _yes "$F_EXCEL"   && _dep "  excel: ^4.0.2 # Read & Write Excel files"
+  _yes "$F_CHARTS"  && _dep "  fl_chart: ^0.70.2 # Drawing interactive charts"
+  _yes "$F_EXCEL"   && _dep "  excel: ^4.0.6 # Read & Write Excel files"
   if _yes "$F_PDF_GEN"; then
-    _dep "  pdf: ^3.10.7 # Create PDF files programmatically"
-    _dep "  printing: ^5.12.0 # Print PDFs from device"
+    _dep "  pdf: ^3.11.1 # Create PDF files programmatically"
+    _dep "  printing: ^5.13.4 # Print PDFs from device"
   fi
   _yes "$F_QR_GEN" && _dep "  qr_flutter: ^4.1.0 # Generate & show QR codes"
 
   # ── Logging / Crash ──────────────────────────────────────────────
-  if _yes "$F_LOGGING" || _yes "$F_SENTRY"; then
+  # NOTE: sentry_flutter removed — firebase_crashlytics already handles crash reporting.
+  if _yes "$F_LOGGING"; then
     _dep ""
     _dep "  # ------- Logging & Crash Reporting --------"
+    _dep "  logger: ^2.5.0 # Beautiful console logs"
   fi
-  _yes "$F_LOGGING" && _dep "  logger: ^2.1.0 # Beautiful console logs"
-  _yes "$F_SENTRY"  && _dep "  sentry_flutter: ^7.14.0 # Sentry crash reporting"
 
   # ── Always-on utils ──────────────────────────────────────────────
   _dep ""
   _dep "  # ------- Core Utilities --------"
-  _dep "  intl: ^0.19.0 # Date and number formatting"
+  _dep "  intl: ^0.20.2 # Date and number formatting"
   _dep "  dartz: ^0.10.1 # Functional programming (Either, Option)"
-  _dep "  flutter_secure_storage: ^9.0.0 # Encrypted key-value storage (for tokens)"
-  _dep "  cached_network_image: ^3.3.1 # Cache images from network"
-  _dep "  flutter_screenutil: ^5.9.0 # Adapt UI to different screen sizes"
-  _dep "  lottie: ^3.0.0 # Beautiful After Effects animations"
+  _dep "  flutter_secure_storage: ^9.2.2 # Encrypted key-value storage (for tokens)"
+  _dep "  cached_network_image: ^3.4.1 # Cache images from network"
+  _dep "  flutter_screenutil: ^5.9.3 # Adapt UI to different screen sizes"
+  _dep "  lottie: ^3.2.0 # Beautiful After Effects animations"
+  _dep ""
+  _dep "  # ------- Ads & Monetization --------"
+  _dep "  google_mobile_ads: ^7.0.0 # Google Mobile Ads (AdMob) integration"
+  _dep ""
+  _dep "  # ------- Local Storage (Simple) --------"
+  _dep "  shared_preferences: ^2.3.3 # Simple key-value storage for app settings"
+  _dep ""
+  _dep "  # ------- App Store Utilities --------"
+  _dep "  in_app_review: ^2.0.9 # Native in-app rating dialog"
+  _dep "  in_app_update: ^4.2.5 # In-app updates for Android"
+  _dep ""
+  _dep "  # ------- HTTP Client (Simple) --------"
+  _dep "  http: ^1.6.0 # Simple HTTP client for basic API calls"
 
   # ── Dev dependencies ─────────────────────────────────────────────
-  # FIX: build_runner is added only when at least one code-gen package is selected
   local _NEEDS_BUILD_RUNNER=false
-  _yes "$F_DI"       && _NEEDS_BUILD_RUNNER=true
-  _yes "$F_AUTOROUTE" && _NEEDS_BUILD_RUNNER=true
+  _yes "$F_DI"                                        && _NEEDS_BUILD_RUNNER=true
   [[ "$STORAGE_CHOICE" == "1" || "$STORAGE_CHOICE" == "4" ]] && _NEEDS_BUILD_RUNNER=true
+  [[ "$API_CHOICE" == "1" || "$API_CHOICE" == "5" ]]  && _NEEDS_BUILD_RUNNER=true
 
-  $_NEEDS_BUILD_RUNNER && _devdep "  build_runner: ^2.4.7 # Runs code generators"
-  _yes "$F_DI"       && _devdep "  injectable_generator: ^2.4.1 # Code gen for injectable"
-  _yes "$F_AUTOROUTE" && _devdep "  auto_route_generator: ^7.3.2 # Code gen for auto_route"
-  [[ "$STORAGE_CHOICE" == "1" ]] && _devdep "  hive_generator: ^2.0.1 # Code gen for Hive"
+  $_NEEDS_BUILD_RUNNER && _devdep "  build_runner: ^2.4.13 # Runs code generators"
+  _yes "$F_DI" && _devdep "  injectable_generator: ^2.6.0 # Code gen for injectable"
+  # NOTE: auto_route_generator removed — auto_route removed
+  [[ "$STORAGE_CHOICE" == "1" ]] && _devdep "  hive_ce_generator: ^1.11.1 # Code gen for Hive CE"
   [[ "$STORAGE_CHOICE" == "4" ]] && _devdep "  isar_generator: ^3.1.0 # Code gen for Isar"
+  if [[ "$API_CHOICE" == "1" || "$API_CHOICE" == "5" ]]; then
+    _devdep "  retrofit_generator: ^10.2.6 # Code gen for Retrofit"
+  fi
   if _yes "$F_UNIT_TEST"; then
     _devdep "  mockito: ^5.4.4 # Mock dependencies for testing"
-    _devdep "  bloc_test: ^9.1.5 # Testing utilities for BLoC"
+    _devdep "  bloc_test: ^10.0.0 # Testing utilities for BLoC"
   fi
 
   # ── .env conditional lines ───────────────────────────────────────
@@ -608,7 +624,7 @@ mkflutter() {
   _README_MK_PROD=""; _yes "$F_FLAVORS" && _README_MK_PROD='| `make run-prod` | Run prod flavor |'
 
   # ── Detect Flutter / Dart SDK versions ───────────────────────────
-  _SDK_MIN="3.0.0"
+  _SDK_MIN="3.3.0"
   _FLUTTER_VERSION="3.24.0"
   if command -v flutter &>/dev/null; then
     local _FL_FULL _DART_VER _DART_MAJOR _DART_MINOR
@@ -2228,7 +2244,7 @@ class ApiClient {
     } on HandshakeException {
       _throwMaintenance();
     }
-    throw const ApiException('Unexpected error');
+//    throw const ApiException('Unexpected error');
   }
 
   Future<void> _delay(int attempt) =>
@@ -2877,9 +2893,9 @@ import 'dart:math';
 import 'package:flutter/widgets.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:nextgovjob/core/network/api/api_client.dart';
-import 'package:nextgovjob/core/network/api/api_endpoints.dart';
-import 'package:nextgovjob/core/utils/helper.dart';
+import 'package:rohit/core/network/api/api_client.dart';
+import 'package:rohit/core/network/api/api_endpoints.dart';
+import 'package:rohit/core/utils/helpers/admob_helper.dart';
 
 /// Delegate interface for ad events
 abstract class AdEventDelegate {
@@ -3080,7 +3096,7 @@ class AdService extends ChangeNotifier {
           _delegate.onAdFailedToLoad('interstitial', error.message);
         },
       ),
-      request: AdRequest(),
+      request: const AdRequest(),
     );
   }
 
@@ -3099,7 +3115,7 @@ class AdService extends ChangeNotifier {
           _delegate.onAdFailedToLoad('rewarded', error.message);
         },
       ),
-      request: AdRequest(),
+      request: const AdRequest(),
     );
   }
 
@@ -3164,7 +3180,7 @@ class AdService extends ChangeNotifier {
           Future.delayed(const Duration(seconds: 30), loadBannerAd);
         },
       ),
-      request: AdRequest(),
+      request: const AdRequest(),
     ).load();
   }
 
@@ -3528,6 +3544,57 @@ EOF
 
 if _yes "$F_FIREBASE_AUTH"; then
   mkdir -p "${B}/lib/core/services/firebase"
+  mkdir -p "${B}/lib/data/models"
+
+  # ── User model ────────────────────────────────────────────
+  _dart "lib/data/models/user_model.dart"; cat > "${B}/lib/data/models/user_model.dart" << EOF
+class UserModel {
+  final int id;
+  final String firebaseUid;
+  final String email;
+  final String name;
+  final String? avatarUrl;
+  final String provider;
+  final DateTime createdAt;
+
+  UserModel({
+    required this.id,
+    required this.firebaseUid,
+    required this.email,
+    required this.name,
+    this.avatarUrl,
+    required this.provider,
+    required this.createdAt,
+  });
+
+  factory UserModel.fromJson(Map<String, dynamic> json) {
+    return UserModel(
+      id: json['id'] ?? 0,
+      firebaseUid: json['firebaseUid'] ?? '',
+      email: json['email'] ?? '',
+      name: json['name'] ?? '',
+      avatarUrl: json['avatarUrl'],
+      provider: json['provider'] ?? 'google',
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'])
+          : DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'firebaseUid': firebaseUid,
+      'email': email,
+      'name': name,
+      'avatarUrl': avatarUrl,
+      'provider': provider,
+      'createdAt': createdAt.toIso8601String(),
+    };
+  }
+}
+EOF
+
 
  _dart "lib/core/services/firebase/firebase_service.dart"; cat > "${B}/lib/core/services/firebase/firebase_service.dart" << EOF
 import 'package:firebase_core/firebase_core.dart';
@@ -3552,6 +3619,7 @@ import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:rohit/core/network/api/api_client.dart';
 import 'package:rohit/core/network/api/api_endpoints.dart';
+import 'package:rohit/data/models/user_model.dart';
 
 class AuthService {
   // ── Firebase & Google ─────────────────────────────────────
@@ -3566,10 +3634,10 @@ class AuthService {
   // ── State ─────────────────────────────────────────────────
   UserModel? _dbUser;
 
-  UserModel? get dbUser    => _dbUser;
-  int?       get dbUserId  => _dbUser?.id;
-  User?      get currentUser => _auth.currentUser;
-  bool       get isLoggedIn  => currentUser != null;
+  UserModel? get dbUser => _dbUser;
+  int? get dbUserId => _dbUser?.id;
+  User? get currentUser => _auth.currentUser;
+  bool get isLoggedIn => currentUser != null;
 
   // ── Google Sign-In ────────────────────────────────────────
   Future<User?> signInWithGoogle() async {
@@ -3608,24 +3676,22 @@ class AuthService {
   // ── Backend sync ──────────────────────────────────────────
   Future<UserModel?> _syncUserWithBackend(User firebaseUser) async {
     try {
-      final response = await _apiClient
-          .post(
-            ApiEndpoints.userSync,
-            body: {
-              'uid':         firebaseUser.uid,
-              'email':       firebaseUser.email,
-              'displayName': firebaseUser.displayName,
-              'photoURL':    firebaseUser.photoURL,
-              'provider':    'google',
-            },
-          )
-          .timeout(
-            const Duration(seconds: 5),
-            onTimeout: () {
-              debugPrint('⏱ syncUser timeout — uid: ${firebaseUser.uid}');
-              return null;
-            },
-          );
+      final response = await _apiClient.post(
+        ApiEndpoints.userSync,
+        body: {
+          'uid': firebaseUser.uid,
+          'email': firebaseUser.email,
+          'displayName': firebaseUser.displayName,
+          'photoURL': firebaseUser.photoURL,
+          'provider': 'google',
+        },
+      ).timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          debugPrint('⏱ syncUser timeout — uid: ${firebaseUser.uid}');
+          return null;
+        },
+      );
 
       return _dbUser = _parseUser(response);
     } catch (e) {
@@ -3634,18 +3700,19 @@ class AuthService {
     }
   }
 
+  static String userByFirebaseUid(String uid) => '/api/users/$uid';
+
   // ── Fetch DB user ─────────────────────────────────────────
   Future<UserModel?> getDbUser(String firebaseUid) async {
     try {
-      final response = await _apiClient
-          .get(ApiEndpoints.userByFirebaseUid(firebaseUid))
-          .timeout(
-            const Duration(seconds: 5),
-            onTimeout: () {
-              debugPrint('⏱ getDbUser timeout — uid: $firebaseUid');
-              return null;
-            },
-          );
+      final response =
+          await _apiClient.get(userByFirebaseUid(firebaseUid)).timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          debugPrint('⏱ getDbUser timeout — uid: $firebaseUid');
+          return null;
+        },
+      );
 
       return _dbUser = _parseUser(response);
     } catch (e) {
@@ -4565,7 +4632,7 @@ EOF
     cat << EOF
 name: ${PROJECT_NAME}
 description: Flutter app — ${SM_LABEL} | ${API_LABEL} | ${STORAGE_LABEL}
-publish_to: 'none'
+publish_to: "none"
 version: 1.0.0+1
 
 environment:
