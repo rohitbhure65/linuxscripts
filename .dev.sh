@@ -55,3 +55,14 @@ killports() {
 
   sudo kill -9 $TARGET_PIDS 2>/dev/null && echo "✓ Killed port $CHOICE"
 }
+
+
+#####################################
+# SKILL URL
+#####################################
+skillurl() {
+  local url="$1"
+  local mode="${2:-ultra}"
+
+  npx skillui --url "$url" --mode "$mode"
+}
