@@ -681,7 +681,6 @@ mkflutter() {
     "${B}/lib/core/utils/extensions" \
     "${B}/lib/core/utils/formatters" \
     "${B}/lib/core/utils/validators" \
-    "${B}/lib/core/utils/initializers" \
     "${B}/lib/core/utils/helpers" \
     "${B}/lib/core/di" \
     "${B}/lib/core/resources"
@@ -2068,34 +2067,7 @@ EOF
 
   _dart "lib/core/errors/exceptions.dart"
 
-  _dart "lib/core/errors/failures.dart"; cat > "${B}/lib/core/errors/failures.dart" << EOF
-import 'package:equatable/equatable.dart';
-
-abstract class Failure extends Equatable {
-  final String message;
-  const Failure(this.message);
-
-  @override
-  List<Object?> get props => [message];
-}
-
-class ServerFailure extends Failure {
-  const ServerFailure([super.message = 'Server Error']);
-}
-
-class CacheFailure extends Failure {
-  const CacheFailure([super.message = 'Cache Error']);
-}
-
-class NetworkFailure extends Failure {
-  const NetworkFailure([super.message = 'No Internet Connection']);
-}
-
-class ValidationFailure extends Failure {
-  const ValidationFailure(super.message);
-}
-EOF
-
+  _dart "lib/core/errors/failures.dart"
   _dart "lib/core/errors/error_messages.dart"
 
 if [[ "$API_CHOICE" == "1" || "$API_CHOICE" == "5" ]]; then
@@ -2106,7 +2078,6 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 import 'package:rohit/core/constants/app_api.dart';
-import 'package:injectable/injectable.dart';
 
 // ─────────────────────────────────────────────────────────────
 //  ApiException
@@ -2137,9 +2108,10 @@ abstract class TokenProvider {
 // ─────────────────────────────────────────────────────────────
 //  ApiClient
 // ─────────────────────────────────────────────────────────────
-@lazySingleton
 class ApiClient {
-  ApiClient();
+  ApiClient._internal();
+  static final ApiClient _instance = ApiClient._internal();
+  factory ApiClient() => _instance;
 
   TokenProvider? _tokenProvider;
 
@@ -2327,6 +2299,7 @@ class ApiClient {
     _client = null;
   }
 }
+
 EOF
 
     _dart "lib/core/network/api/api_endpoints.dart"; cat > "${B}/lib/core/network/api/api_endpoints.dart" << EOF
@@ -2917,11 +2890,9 @@ EOF
 # ── Admob service ────────────────────────────────────────────
 _dart "lib/core/services/admob_service.dart"; cat > "${B}/lib/core/services/admob_service.dart" << 'EOF'
 import 'dart:math';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:injectable/injectable.dart';
 import 'package:rohit/core/network/api/api_client.dart';
 import 'package:rohit/core/network/api/api_endpoints.dart';
 import 'package:rohit/core/utils/helpers/admob_helper.dart';
@@ -2965,19 +2936,14 @@ class EmptyAdEventDelegate implements AdEventDelegate {
 typedef VoidCallback = void Function();
 
 /// Service class for managing Google Mobile Ads
-@lazySingleton
+/// Can be used as:
+/// - Singleton: AdService.instance.showRewardedAd()
 class AdService extends ChangeNotifier {
-  // static final AdService instance = AdService();
-  // AdService()
-  //     : _delegate = EmptyAdEventDelegate(),
-  //       _showProbability = 0.5;
   static final AdService _instance = AdService._internal();
-  AdService._internal()
-      : _delegate = EmptyAdEventDelegate(),
-        _showProbability = 0.5;
 
   /// Singleton instance - use anywhere with AdService.instance
   static AdService get instance => _instance;
+
   InterstitialAd? _interstitialAd;
   RewardedAd? _rewardedAd;
   BannerAd? _bannerAd;
@@ -2988,7 +2954,9 @@ class AdService extends ChangeNotifier {
   bool _adsIsActive = false; // Default to true, will be updated from API
   bool _adsStatusLoaded = false;
 
-// Class members continue...
+  AdService._internal()
+    : _delegate = EmptyAdEventDelegate(),
+      _showProbability = 0.5;
 
   /// Whether the ad service has been initialized
   bool get isInitialized => _isInitialized;
@@ -3019,16 +2987,18 @@ class AdService extends ChangeNotifier {
   /// Returns true if ads are enabled, false if disabled
   Future<bool> fetchAdsStatus() async {
     try {
-      final response = await ApiClient().get(ApiEndpoints.adsStatus).timeout(
-        const Duration(seconds: 5),
-        onTimeout: () {
-          debugPrint('Ads status timeout - assuming ads active');
-          return {
-            'success': false,
-            'data': {'adsIsActive': false},
-          };
-        },
-      );
+      final response = await ApiClient()
+          .get(ApiEndpoints.adsStatus)
+          .timeout(
+            const Duration(seconds: 5),
+            onTimeout: () {
+              debugPrint('Ads status timeout - assuming ads active');
+              return {
+                'success': false,
+                'data': {'adsIsActive': false},
+              };
+            },
+          );
       if (response['success'] == true && response['data'] != null) {
         _adsIsActive = response['data']['adsIsActive'] ?? true;
         _adsStatusLoaded = true;
@@ -3291,9 +3261,7 @@ EOF
 _yes "$F_CONNECTIVITY" && _dart "lib/core/services/connectivity_service.dart"; cat > "${B}/lib/core/services/connectivity_service.dart" << EOF
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:injectable/injectable.dart';
 
-@lazySingleton
 class ConnectivityService {
   static final ConnectivityService _instance = ConnectivityService._internal();
   factory ConnectivityService() => _instance;
@@ -4303,52 +4271,30 @@ extension NullableStringExtensions on String? {
 }
 EOF
 
+
+#   _dart "lib/core/utils/extensions/date_time_extensions.dart";cat > "${B}/lib/core/utils/extensions/date_time_extensions.dart" << 'EOF'
+# import 'package:intl/intl.dart';
+
+# extension DateExtensions on DateTime {
+#   String get formatted => DateFormat('dd MMM yyyy').format(this);
+#   String get formattedWithTime => DateFormat('dd MMM yyyy, hh:mm a').format(this);
+#   String get timeOnly => DateFormat('hh:mm a').format(this);
+#   String get monthYear => DateFormat('MMMM yyyy').format(this);
+#   bool get isToday {
+#     final now = DateTime.now();
+#     return year == now.year && month == now.month && day == now.day;
+#   }
+#   bool get isYesterday {
+#     final yesterday = DateTime.now().subtract(const Duration(days: 1));
+#     return year == yesterday.year &&
+#         month == yesterday.month &&
+#         day == yesterday.day;
+#   }
+# }
+# EOF
+
   _dart "lib/core/utils/formatters/date_formatter.dart"
   _dart "lib/core/utils/formatters/number_formatter.dart"
-  _dart "lib/core/utils/initializers/core_initializer.dart";cat > "${B}/lib/core/utils/initializers/core_initializer.dart" << 'EOF'
-import 'dart:async';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:rohit/core/di/injection_container.dart';
-import 'package:rohit/core/services/service.dart';
-
-class CoreInitializer {
-  static Future<void> init() async {
-    WidgetsFlutterBinding.ensureInitialized();
-
-    // Initialize Dependency Injection
-    await configureDependencies();
-
-    // Initialize Firebase
-    await _initializeFirebaseSafely();
-
-    // Set preferred orientations
-    await SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
-
-    // Initialize Ads
-    await MobileAds.instance.initialize();
-    unawaited(AdService.instance.initialize(showProbability: 0.3));
-
-    // Initialize Connectivity
-    unawaited(ConnectivityService().initialize());
-
-    // Additional initializations can go here
-  }
-
-  static Future<void> _initializeFirebaseSafely() async {
-    try {
-      await Firebase.initializeApp();
-    } catch (error) {
-      debugPrint('Firebase initialization skipped or failed: $error');
-    }
-  }
-}
-EOF
 
   _dart "lib/core/utils/validators/validators.dart";cat > "${B}/lib/core/utils/validators/validators.dart" << 'EOF'
 class Validators {
@@ -4673,13 +4619,6 @@ EOF
   _dart "lib/shared/mixins/loading_mixin.dart"
 
   _dart "lib/routes/app_pages.dart"
-  _dart "lib/routes/navigator_key.dart"; cat > "${B}/lib/routes/navigator_key.dart" << EOF
-import 'package:flutter/material.dart';
-
-class MyNavigatorKey {
-  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-}
-EOF
   if _yes "$F_GOROUTER" || _yes "$F_AUTOROUTE"; then
     _dart "lib/routes/guards/auth_guard.dart"
     _dart "lib/routes/guards/role_guard.dart"
@@ -4688,11 +4627,81 @@ EOF
 # ── app.dart ────────────────────────────────────────────
 _dart "lib/app.dart"; cat > "${B}/lib/app.dart" << EOF
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
+
+class MainApp extends StatefulWidget {
+  const MainApp({super.key});
+
+  @override
+  State<MainApp> createState() => _MainAppState();
+}
+
+class _MainAppState extends State<MainApp> {
+  @override
+  Widget build(BuildContext context) {
+    return const Text('Hello World');
+  }
+}
+EOF
+
+
+  # ── main.dart ────────────────────────────────────────────
+  _dart "lib/main.dart"; cat > "${B}/lib/main.dart" << EOF
+import 'dart:async';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:rohit/routes/navigator_key.dart';
-import 'package:rohit/core/services/service.dart';
-import 'package:rohit/core/theme/app_theme.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:${PROJECT_NAME}/app.dart';
+import 'package:${PROJECT_NAME}/core/services/service.dart';
+import 'package:${PROJECT_NAME}/core/theme/app_theme.dart';
+import 'package:${PROJECT_NAME}/core/utils/helpers/theme_helper.dart';
+
+// Global navigator key for accessing context from anywhere
+class MyNavigatorKey {
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
+}
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Automatic according to the theme
+  final brightness =
+      WidgetsBinding.instance.platformDispatcher.platformBrightness;
+
+  SystemChrome.setSystemUIOverlayStyle(
+    // AppColorScheme.overlayStyle(Brightness.light),
+    AppColorScheme.overlayStyle(brightness),
+  );
+
+  // Pre-initialize AdService before UI loads (non-blocking)
+  // This avoids initializing on every screen
+  unawaited(AdService.instance.initialize(showProbability: 0.3));
+
+  // Initialize connectivity service (non-blocking)
+  unawaited(ConnectivityService().initialize());
+
+  // Set preferred orientations (portrait only)
+  SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+
+  // Google Admob
+  MobileAds.instance.initialize();
+  await _initializeFirebaseSafely();
+
+  runApp(const MyApp());
+}
+
+Future<void> _initializeFirebaseSafely() async {
+  try {
+    await Firebase.initializeApp();
+  } catch (error) {
+    debugPrint('Firebase initialization skipped: $error');
+  }
+}
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
@@ -4713,28 +4722,39 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+    WidgetsBinding.instance.removeObserver(this);
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
+
+    // Handle app lifecycle for performance optimization
     switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+        // App is in background or inactive - reduce resource usage
+        break;
       case AppLifecycleState.resumed:
+        // App is resumed - check for app updates
         _checkForUpdates();
         break;
       case AppLifecycleState.detached:
+        // App is being terminated - cleanup
         _cleanup();
         break;
-      default:
+      case AppLifecycleState.hidden:
+        // App is hidden
         break;
     }
   }
 
+  // Google Play Store New Update
   void _checkForUpdates() {
+    // Use post frame callback to ensure context is ready
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final context = MyNavigatorKey.navigatorKey.currentContext;
+      final BuildContext? context = MyNavigatorKey.navigatorKey.currentContext;
       if (context != null) {
         UpdateService().checkForUpdate(context);
       }
@@ -4742,60 +4762,23 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   }
 
   void _cleanup() {
+    // Dispose services when app terminates
     AdService.instance.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return ScreenUtilInit(
-      designSize: const Size(360, 690),
-      minTextAdapt: true,
-      splitScreenMode: true,
-      builder: (context, child) {
-        return GetMaterialApp(
-          navigatorKey: MyNavigatorKey.navigatorKey,
-          title: 'MyApp',
-          debugShowCheckedModeBanner: false,
-          theme: AppTheme.lightTheme,
-          darkTheme: AppTheme.darkTheme,
-          themeMode: ThemeMode.system,
-          home: const MainApp(),
-        );
-      },
+    return GetMaterialApp(
+      navigatorKey: MyNavigatorKey.navigatorKey,
+      title: 'MyApp',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: ThemeMode.system,
+      home: const MainApp(),
     );
   }
 }
-
-class MainApp extends StatefulWidget {
-  const MainApp({super.key});
-
-  @override
-  State<MainApp> createState() => _MainAppState();
-}
-
-class _MainAppState extends State<MainApp> {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Home')),
-      body: const Center(child: Text('Hello World')),
-    );
-  }
-}
-EOF
-
-
-  # ── main.dart ────────────────────────────────────────────
-  _dart "lib/main.dart"; cat > "${B}/lib/main.dart" << EOF
-import 'package:flutter/material.dart';
-import 'package:${PROJECT_NAME}/app.dart';
-import 'package:${PROJECT_NAME}/core/utils/initializers/core_initializer.dart';
-
-void main() async {
-  await CoreInitializer.init();
-  runApp(const MyApp());
-}
-
 EOF
 
 
@@ -4816,8 +4799,6 @@ EOF
     _dart "test/widget/features/auth_widget_test.dart"
     _dart "test/widget/shared/shared_widgets_test.dart"
   fi
-
-  rm "${B}/test/widget_test.dart" 2> /dev/null || true
 
   if _yes "$F_INTEGRATION_TEST"; then
     _dart "test/integration/app_test.dart"
