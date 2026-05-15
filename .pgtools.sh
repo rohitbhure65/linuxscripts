@@ -2,12 +2,76 @@
 
 # ─────────────────────────────────────────────────────────────────
 # pgtools — Full PostgreSQL Interactive Toolkit
-# Add to ~/.bashrc:
-#   source ~/.pgtools.sh
-# Then run:
-#   pgtools
+#
+# INSTALL:
+#   cp .pgtools.sh ~/.pgtools.sh
+#   echo 'source ~/.pgtools.sh' >> ~/.bashrc
+#   source ~/.bashrc
+#
+# USAGE:
+#   pgtools   → Auto-starts PostgreSQL, opens menu, stops on exit
+#
+# BEHAVIOR:
+#   • PostgreSQL auto-starts when you run `pgtools`
+#   • PostgreSQL auto-stops + disables when you exit via option 0
+#   • If terminal is force-closed, EXIT trap also stops PostgreSQL
 # ─────────────────────────────────────────────────────────────────
 
+
+# =================================================================
+# INTERNAL: PostgreSQL lifecycle helpers
+# =================================================================
+
+_pg_start() {
+  local RED='\033[0;31m'
+  local GREEN='\033[0;32m'
+  local CYAN='\033[0;36m'
+  local DIM='\033[2m'
+  local RESET='\033[0m'
+
+  # Already running? Skip.
+  if pg_isready -q 2>/dev/null; then
+    echo -e "${GREEN}  ✓ PostgreSQL is already running.${RESET}"
+    return 0
+  fi
+
+  echo -e "${CYAN}  🐘 Starting PostgreSQL service...${RESET}"
+  sudo systemctl enable postgresql 2>/dev/null
+  sudo systemctl start  postgresql 2>/dev/null
+
+  echo -e "${DIM}  Waiting for PostgreSQL to be ready...${RESET}"
+  local TRIES=0
+  until pg_isready -q 2>/dev/null; do
+    if [[ $TRIES -ge 15 ]]; then
+      echo -e "${RED}  ✗ PostgreSQL did not become ready after 30 seconds.${RESET}"
+      echo -e "${RED}    Please start it manually: sudo systemctl start postgresql${RESET}"
+      return 1
+    fi
+    printf "${DIM}.${RESET}"
+    sleep 2
+    ((TRIES++))
+  done
+  echo ""
+  echo -e "${GREEN}  ✓ PostgreSQL is ready.${RESET}"
+  return 0
+}
+
+_pg_stop() {
+  local GREEN='\033[0;32m'
+  local YELLOW='\033[1;33m'
+  local RESET='\033[0m'
+
+  echo ""
+  echo -e "${YELLOW}  🐘 Stopping PostgreSQL service...${RESET}"
+  sudo systemctl stop    postgresql 2>/dev/null
+  sudo systemctl disable postgresql 2>/dev/null
+  echo -e "${GREEN}  ✓ PostgreSQL stopped & disabled.${RESET}"
+}
+
+
+# =================================================================
+# pgtools — Interactive Menu
+# =================================================================
 pgtools() {
 
   # ── Colors ──────────────────────────────────────────────────────
@@ -21,12 +85,22 @@ pgtools() {
   local DIM='\033[2m'
   local RESET='\033[0m'
 
+  # ── Auto-start PostgreSQL ────────────────────────────────────────
+  echo ""
+  echo -e "${BOLD}${CYAN}╔══════════════════════════════════════════════════════════╗${RESET}"
+  echo -e "${BOLD}${CYAN}║          🐘  pgtools — PostgreSQL Toolkit                ║${RESET}"
+  echo -e "${BOLD}${CYAN}╚══════════════════════════════════════════════════════════╝${RESET}"
+  echo ""
+
+  _pg_start || return 1
+
+  # ── EXIT trap: stop PostgreSQL if terminal is force-closed ───────
+  # (clean exit via option 0 also calls _pg_stop explicitly)
+  trap '_pg_stop' EXIT
+
   # ── One-time login ───────────────────────────────────────────────
   echo ""
-  echo -e "${BOLD}${CYAN}╔══════════════════════════════════════════════╗${RESET}"
-  echo -e "${BOLD}${CYAN}║     🐘 pgtools — PostgreSQL Login            ║${RESET}"
-  echo -e "${BOLD}${CYAN}╚══════════════════════════════════════════════╝${RESET}"
-  echo ""
+  echo -e "${BOLD}${CYAN}── Login ─────────────────────────────────────────────────${RESET}"
   read -rp "  PostgreSQL username [postgres]: " PG_USER
   PG_USER="${PG_USER:-postgres}"
   read -rsp "  Password (hidden): " PG_PASS; echo ""
@@ -38,6 +112,8 @@ pgtools() {
   if [[ $? -ne 0 ]]; then
     echo -e "${RED}  ✗ Login failed. Check username/password.${RESET}"
     echo -e "${DIM}  ${_test}${RESET}"
+    trap - EXIT
+    _pg_stop
     return 1
   fi
   echo -e "${GREEN}  ✓ Connected as '${BOLD}${PG_USER}${RESET}${GREEN}'${RESET}"
@@ -62,8 +138,6 @@ pgtools() {
   # SMART PICKERS — Auto-fetch + Numbered Selection
   # ════════════════════════════════════════════════════════════════
 
-  # Fetches all databases and lets user pick by number
-  # Sets SEL_DB on success, returns 1 on failure
   _pick_database() {
     echo -e "${BOLD}${CYAN}  📦 Fetching databases...${RESET}"
     local raw
@@ -106,9 +180,6 @@ pgtools() {
     echo ""
   }
 
-  # Fetches all tables in SEL_DB and lets user pick by number
-  # Requires SEL_DB to be set already
-  # Sets SEL_TABLE on success, returns 1 on failure
   _pick_table() {
     if [[ -z "$SEL_DB" ]]; then
       echo -e "${RED}  ✗ No database selected.${RESET}"
@@ -156,8 +227,6 @@ pgtools() {
     echo ""
   }
 
-  # Fetches all roles/users and lets user pick by number
-  # Sets SEL_USER on success, returns 1 on failure
   _pick_user() {
     echo -e "${BOLD}${CYAN}  👥 Fetching roles/users...${RESET}"
     local raw
@@ -265,23 +334,21 @@ pgtools() {
   # SECTION B: DATABASE OPERATIONS
   # ════════════════════════════════════════════════════════════════
 
-  # B1: List all databases
   _list_databases() {
     echo ""
     echo -e "${BOLD}${CYAN}📦 All Databases:${RESET}"
     _pg_run "\l+"
   }
 
-  # B2: Create database
   _create_database() {
     echo -e "${YELLOW}  New database name:${RESET}"; read -rp "  > " NEW_DB
     [[ -z "$NEW_DB" ]] && echo -e "${RED}  ✗ Empty.${RESET}" && return 1
 
     echo ""
-    echo -e "${YELLOW}  Select owner (or press Enter to skip → default: postgres):${RESET}"
+    echo -e "${YELLOW}  Select owner (or press Ctrl+C to skip → default: postgres):${RESET}"
     local SEL_USER=""
     _pick_user
-    local NEW_OWNER="$SEL_USER"   # empty if user skipped or _pick_user failed
+    local NEW_OWNER="$SEL_USER"
 
     local OWN_SQL=""
     [[ -n "$NEW_OWNER" ]] && OWN_SQL="WITH OWNER = ${NEW_OWNER}"
@@ -289,7 +356,6 @@ pgtools() {
     echo -e "${GREEN}  ✓ Database '${NEW_DB}' created.${RESET}"
   }
 
-  # B3: Drop database
   _drop_database() {
     _pick_database || return 1
     local DROP_DB="$SEL_DB"
@@ -300,7 +366,6 @@ pgtools() {
     echo -e "${GREEN}  ✓ Database '${DROP_DB}' dropped.${RESET}"
   }
 
-  # B4: Rename database
   _rename_database() {
     _pick_database || return 1
     local OLD_DB="$SEL_DB"
@@ -314,14 +379,12 @@ pgtools() {
   # SECTION C: TABLE OPERATIONS
   # ════════════════════════════════════════════════════════════════
 
-  # C1: List all tables
   _list_tables() {
     _pick_database || return 1
     echo -e "${BOLD}${CYAN}📋 Tables in '${SEL_DB}':${RESET}"
     _pg_run_db "$SEL_DB" "\dt+"
   }
 
-  # C2: Describe table
   _describe_table() {
     _pick_database || return 1
     _pick_table    || return 1
@@ -329,7 +392,6 @@ pgtools() {
     _pg_run_db "$SEL_DB" "\d+ ${SEL_TABLE}"
   }
 
-  # C3: View table data (SELECT *)
   _view_table_data() {
     _pick_database || return 1
     _pick_table    || return 1
@@ -337,14 +399,12 @@ pgtools() {
     _pg_run_db "$SEL_DB" "SELECT * FROM ${SEL_TABLE};"
   }
 
-  # C4: Row count
   _row_count() {
     _pick_database || return 1
     _pick_table    || return 1
     _pg_run_db "$SEL_DB" "SELECT COUNT(*) AS total_rows FROM ${SEL_TABLE};"
   }
 
-  # C5: Create table
   _create_table() {
     _pick_database || return 1
     echo -e "${YELLOW}  New table name:${RESET}"; read -rp "  > " SEL_TABLE
@@ -375,7 +435,6 @@ pgtools() {
     echo -e "${GREEN}  ✓ Table '${SEL_TABLE}' created.${RESET}"
   }
 
-  # C6: Drop table
   _drop_table() {
     _pick_database || return 1
     _pick_table    || return 1
@@ -389,7 +448,6 @@ pgtools() {
     echo -e "${GREEN}  ✓ Table '${DROP_TBL}' dropped.${RESET}"
   }
 
-  # C7: Truncate table
   _truncate_table() {
     _pick_database || return 1
     _pick_table    || return 1
@@ -400,7 +458,6 @@ pgtools() {
     echo -e "${GREEN}  ✓ Table '${SEL_TABLE}' truncated.${RESET}"
   }
 
-  # C8: Rename table
   _rename_table() {
     _pick_database || return 1
     _pick_table    || return 1
@@ -415,7 +472,6 @@ pgtools() {
   # SECTION D: COLUMN OPERATIONS
   # ════════════════════════════════════════════════════════════════
 
-  # D1: Add column
   _add_column() {
     _pick_database || return 1
     _pick_table    || return 1
@@ -426,12 +482,10 @@ pgtools() {
     echo -e "${GREEN}  ✓ Column added.${RESET}"
   }
 
-  # D2: Drop column
   _drop_column() {
     _pick_database || return 1
     _pick_table    || return 1
 
-    # Show columns to pick from
     echo -e "${BOLD}${CYAN}  📋 Fetching columns in '${SEL_TABLE}'...${RESET}"
     local raw_cols
     raw_cols=$(PGPASSWORD="$PG_PASS" psql -U "$PG_USER" -h localhost -d "$SEL_DB" -Atc \
@@ -469,7 +523,6 @@ pgtools() {
     echo -e "${GREEN}  ✓ Column '${SEL_COL}' dropped.${RESET}"
   }
 
-  # D3: Rename column
   _rename_column() {
     _pick_database || return 1
     _pick_table    || return 1
@@ -510,7 +563,6 @@ pgtools() {
     echo -e "${GREEN}  ✓ Column renamed '${OLD_COL}' → '${NEW_COL}'.${RESET}"
   }
 
-  # D4: Change column type
   _change_column_type() {
     _pick_database || return 1
     _pick_table    || return 1
@@ -555,7 +607,6 @@ pgtools() {
   # SECTION E: INDEX OPERATIONS
   # ════════════════════════════════════════════════════════════════
 
-  # E1: List indexes
   _list_indexes() {
     _pick_database || return 1
     echo -e "${YELLOW}  Filter by table? (press Enter to list all indexes):${RESET}"
@@ -567,7 +618,6 @@ pgtools() {
     fi
   }
 
-  # E2: Create index
   _create_index() {
     _pick_database || return 1
     _pick_table    || return 1
@@ -585,7 +635,6 @@ pgtools() {
     echo -e "${GREEN}  ✓ Index '${IDX_NAME}' created.${RESET}"
   }
 
-  # E3: Drop index
   _drop_index() {
     _pick_database || return 1
 
@@ -628,14 +677,12 @@ pgtools() {
   # SECTION F: USER / ROLE OPERATIONS
   # ════════════════════════════════════════════════════════════════
 
-  # F1: List all roles/users
   _list_users() {
     echo ""
     echo -e "${BOLD}${CYAN}👥 All Roles/Users:${RESET}"
     _pg_run "\du+"
   }
 
-  # F2: Create user
   _create_user() {
     read -rp "  New username : " NEW_USER
     read -rsp "  Password     : " NEW_PASS; echo ""
@@ -647,7 +694,6 @@ pgtools() {
     echo -e "${GREEN}  ✓ User '${NEW_USER}' created.${RESET}"
   }
 
-  # F3: Drop user
   _drop_user() {
     _pick_user || return 1
     local DROP_USER="$SEL_USER"
@@ -657,7 +703,6 @@ pgtools() {
     echo -e "${GREEN}  ✓ User '${DROP_USER}' dropped.${RESET}"
   }
 
-  # F4: Change user password
   _change_password() {
     _pick_user || return 1
     local CHG_USER="$SEL_USER"
@@ -669,7 +714,6 @@ pgtools() {
     echo -e "${GREEN}  ✓ Password updated for '${CHG_USER}'.${RESET}"
   }
 
-  # F5: Grant privileges
   _grant_privileges() {
     _pick_database || return 1
     _pick_user     || return 1
@@ -685,7 +729,6 @@ pgtools() {
     echo -e "${GREEN}  ✓ All privileges granted to '${PRIV_USER}' on '${SEL_DB}'.${RESET}"
   }
 
-  # F6: Revoke privileges
   _revoke_privileges() {
     _pick_database || return 1
     _pick_user     || return 1
@@ -716,21 +759,18 @@ pgtools() {
   # SECTION H: MONITORING / INFO
   # ════════════════════════════════════════════════════════════════
 
-  # H1: Show active connections
   _show_connections() {
     echo ""
     echo -e "${BOLD}${CYAN}🔌 Active Connections:${RESET}"
     _pg_run "SELECT pid, usename, datname, client_addr, state, query_start, LEFT(query,60) AS query FROM pg_stat_activity WHERE state IS NOT NULL ORDER BY query_start DESC;"
   }
 
-  # H2: Show database sizes
   _show_db_sizes() {
     echo ""
     echo -e "${BOLD}${CYAN}💾 Database Sizes:${RESET}"
     _pg_run "SELECT datname, pg_size_pretty(pg_database_size(datname)) AS size FROM pg_database ORDER BY pg_database_size(datname) DESC;"
   }
 
-  # H3: Show table sizes
   _show_table_sizes() {
     _pick_database || return 1
     echo ""
@@ -738,14 +778,12 @@ pgtools() {
     _pg_run_db "$SEL_DB" "SELECT tablename, pg_size_pretty(pg_total_relation_size(quote_ident(tablename))) AS total_size, pg_size_pretty(pg_relation_size(quote_ident(tablename))) AS table_size FROM pg_tables WHERE schemaname='public' ORDER BY pg_total_relation_size(quote_ident(tablename)) DESC;"
   }
 
-  # H4: Show running queries
   _show_running_queries() {
     echo ""
     echo -e "${BOLD}${CYAN}⚡ Running Queries:${RESET}"
     _pg_run "SELECT pid, usename, datname, state, wait_event_type, wait_event, NOW() - query_start AS duration, LEFT(query,80) AS query FROM pg_stat_activity WHERE state = 'active' ORDER BY duration DESC NULLS LAST;"
   }
 
-  # H5: Kill query by PID
   _kill_query() {
     echo ""
     echo -e "${BOLD}${CYAN}⚡ Active Processes:${RESET}"
@@ -757,7 +795,6 @@ pgtools() {
     echo -e "${GREEN}  ✓ Process ${KILL_PID} terminated.${RESET}"
   }
 
-  # H6: Show PostgreSQL version and config
   _show_pg_info() {
     echo ""
     echo -e "${BOLD}${CYAN}ℹ️  PostgreSQL Info:${RESET}"
@@ -767,7 +804,6 @@ pgtools() {
     _pg_run "SHOW max_connections; SHOW shared_buffers; SHOW work_mem; SHOW data_directory;"
   }
 
-  # H7: Backup database (pg_dump)
   _backup_database() {
     _pick_database || return 1
     local BKP_DB="$SEL_DB"
@@ -782,7 +818,6 @@ pgtools() {
     fi
   }
 
-  # H8: Restore database (pg_restore)
   _restore_database() {
     _pick_database || return 1
     local RST_DB="$SEL_DB"
@@ -795,7 +830,7 @@ pgtools() {
   }
 
   # ════════════════════════════════════════════════════════════════
-  # MAIN MENU
+  # MAIN MENU LOOP
   # ════════════════════════════════════════════════════════════════
   while true; do
     echo ""
@@ -854,7 +889,7 @@ pgtools() {
     echo -e "${BOLD}${YELLOW}  ━━ CUSTOM SQL ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
     echo -e "  ${GREEN}35)${RESET} 💻  Run custom SQL      ${DIM}-- SELECT * FROM users WHERE ...${RESET}"
     echo ""
-    echo -e "  ${RED} 0)${RESET} 🚪  Exit"
+    echo -e "  ${RED} 0)${RESET} 🚪  Exit  ${DIM}(stops PostgreSQL)${RESET}"
     echo ""
     read -rp "  Choose option [0-35]: " CHOICE
 
@@ -895,7 +930,14 @@ pgtools() {
       33) _backup_database ;;
       34) _restore_database ;;
       35) _run_custom_sql ;;
-       0) echo -e "${CYAN}  Goodbye! 🐘${RESET}"; echo ""; return 0 ;;
+       0)
+          # Disable trap first (clean exit, not crash)
+          trap - EXIT
+          echo -e "${CYAN}  Goodbye! 🐘${RESET}"
+          _pg_stop
+          echo ""
+          return 0
+          ;;
        *) echo -e "${RED}  ✗ Invalid option. Choose 0-35.${RESET}" ;;
     esac
 

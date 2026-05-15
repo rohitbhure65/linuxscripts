@@ -2,12 +2,76 @@
 
 # ─────────────────────────────────────────────────────────────────
 # pgsetup — Interactive PostgreSQL database + user setup
-# Add to ~/.bashrc:
-#   source ~/.pgsetup.sh
-# Then run:
-#   pgsetup
+#
+# INSTALL:
+#   cp .pgsetup.sh ~/.pgsetup.sh
+#   echo 'source ~/.pgsetup.sh' >> ~/.bashrc
+#   source ~/.bashrc
+#
+# USAGE:
+#   pgsetup   → Auto-starts PostgreSQL, runs setup, stops on exit
+#
+# BEHAVIOR:
+#   • PostgreSQL auto-starts when you run `pgsetup`
+#   • PostgreSQL auto-stops + disables when setup completes
+#   • If terminal is force-closed, EXIT trap also stops PostgreSQL
 # ─────────────────────────────────────────────────────────────────
 
+
+# =================================================================
+# INTERNAL: PostgreSQL lifecycle helpers
+# =================================================================
+
+_pg_start() {
+  local RED='\033[0;31m'
+  local GREEN='\033[0;32m'
+  local CYAN='\033[0;36m'
+  local DIM='\033[2m'
+  local RESET='\033[0m'
+
+  # Already running? Skip.
+  if pg_isready -q 2>/dev/null; then
+    echo -e "${GREEN}  ✓ PostgreSQL is already running.${RESET}"
+    return 0
+  fi
+
+  echo -e "${CYAN}  🐘 Starting PostgreSQL service...${RESET}"
+  sudo systemctl enable postgresql 2>/dev/null
+  sudo systemctl start  postgresql 2>/dev/null
+
+  echo -e "${DIM}  Waiting for PostgreSQL to be ready...${RESET}"
+  local TRIES=0
+  until pg_isready -q 2>/dev/null; do
+    if [[ $TRIES -ge 15 ]]; then
+      echo -e "${RED}  ✗ PostgreSQL did not become ready after 30 seconds.${RESET}"
+      echo -e "${RED}    Please start it manually: sudo systemctl start postgresql${RESET}"
+      return 1
+    fi
+    printf "${DIM}.${RESET}"
+    sleep 2
+    ((TRIES++))
+  done
+  echo ""
+  echo -e "${GREEN}  ✓ PostgreSQL is ready.${RESET}"
+  return 0
+}
+
+_pg_stop() {
+  local GREEN='\033[0;32m'
+  local YELLOW='\033[1;33m'
+  local RESET='\033[0m'
+
+  echo ""
+  echo -e "${YELLOW}  🐘 Stopping PostgreSQL service...${RESET}"
+  sudo systemctl stop    postgresql 2>/dev/null
+  sudo systemctl disable postgresql 2>/dev/null
+  echo -e "${GREEN}  ✓ PostgreSQL stopped & disabled.${RESET}"
+}
+
+
+# =================================================================
+# pgsetup — Interactive Setup
+# =================================================================
 pgsetup() {
 
   # ── Colors ──────────────────────────────────────────────────────
@@ -23,12 +87,36 @@ pgsetup() {
   echo -e "${BOLD}${CYAN}║     🐘 PostgreSQL Interactive Setup Tool     ║${RESET}"
   echo -e "${BOLD}${CYAN}╚══════════════════════════════════════════════╝${RESET}"
   echo ""
+
+  # ── Auto-start PostgreSQL ────────────────────────────────────────
+  _pg_start || return 1
+
+  # ── EXIT trap: stop PostgreSQL if terminal is force-closed ───────
+  # (normal completion also calls _pg_stop explicitly at the end)
+  trap '_pg_stop' EXIT
+
+  # ── Info ─────────────────────────────────────────────────────────
+  echo ""
   echo -e "${YELLOW}This tool will:${RESET}"
   echo -e "  ${GREEN}✓${RESET} Create a PostgreSQL role (user) with superuser login"
   echo -e "  ${GREEN}✓${RESET} Create a new database"
   echo -e "  ${GREEN}✓${RESET} Set the database owner to your role"
   echo -e "  ${GREEN}✓${RESET} Grant all privileges on database, tables, sequences, functions"
   echo -e "  ${GREEN}✓${RESET} Set default privileges for future objects"
+  echo ""
+  echo -e "${YELLOW}Connection Examples:${RESET}"
+  echo ""
+  echo -e "  ${GREEN}✓${RESET} Connect as your new user:"
+  echo -e "      ${CYAN}psql -U USERNAME -d DATABASE -h HOST${RESET}"
+  echo -e "      ${CYAN}Example:${RESET} psql -U admin -d demo -h localhost"
+  echo ""
+  echo -e "  ${GREEN}✓${RESET} Connection string (Prisma / .env):"
+  echo -e "      ${CYAN}DATABASE_URL="postgresql://USERNAME:[PASSWORD]@HOST:5432/DATABASE"${RESET}'"
+  echo -e "      ${CYAN}Example:${RESET} DATABASE_URL="postgresql://admin:secret123@localhost:5432/demo""
+  echo ""
+  echo -e "  ${GREEN}✓${RESET} Connect via postgres superuser:"
+  echo -e "      ${CYAN}sudo -i -u postgres psql -d DATABASE${RESET}"
+  echo -e "      ${CYAN}Example:${RESET} sudo -i -u postgres psql -d demo"
   echo ""
 
   # ── Step 1: DB Username ─────────────────────────────────────────
@@ -41,6 +129,8 @@ pgsetup() {
 
   if [[ -z "$DB_USER" ]]; then
     echo -e "${RED}  ✗ Username cannot be empty. Exiting.${RESET}"
+    trap - EXIT
+    _pg_stop
     return 1
   fi
 
@@ -58,11 +148,15 @@ pgsetup() {
 
   if [[ "$DB_PASS" != "$DB_PASS_CONFIRM" ]]; then
     echo -e "${RED}  ✗ Passwords do not match. Exiting.${RESET}"
+    trap - EXIT
+    _pg_stop
     return 1
   fi
 
   if [[ -z "$DB_PASS" ]]; then
     echo -e "${RED}  ✗ Password cannot be empty. Exiting.${RESET}"
+    trap - EXIT
+    _pg_stop
     return 1
   fi
 
@@ -77,6 +171,8 @@ pgsetup() {
 
   if [[ -z "$DB_NAME" ]]; then
     echo -e "${RED}  ✗ Database name cannot be empty. Exiting.${RESET}"
+    trap - EXIT
+    _pg_stop
     return 1
   fi
 
@@ -108,6 +204,8 @@ pgsetup() {
 
   if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
     echo -e "${RED}  Aborted.${RESET}"
+    trap - EXIT
+    _pg_stop
     return 1
   fi
 
@@ -159,6 +257,8 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
 
   if [[ $? -ne 0 ]]; then
     echo -e "${RED}  ✗ Error in Step 1/2. Check output above.${RESET}"
+    trap - EXIT
+    _pg_stop
     return 1
   fi
 
@@ -168,6 +268,8 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
 
   if [[ $? -ne 0 ]]; then
     echo -e "${RED}  ✗ Error in Step 2/2. Check output above.${RESET}"
+    trap - EXIT
+    _pg_stop
     return 1
   fi
 
@@ -185,5 +287,10 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
   echo ""
   echo -e "  ${CYAN}Connect via postgres superuser:${RESET}"
   echo -e "  ${GREEN}sudo -i -u postgres psql -d ${DB_NAME}${RESET}"
+  echo ""
+
+  # ── Clean exit: disable trap then stop PostgreSQL ───────────────
+  trap - EXIT
+  _pg_stop
   echo ""
 }

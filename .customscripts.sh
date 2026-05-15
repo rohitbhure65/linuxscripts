@@ -35,6 +35,7 @@ source ~/.myscripts/.ftools.sh
 source ~/.myscripts/.fsetup.sh
 source ~/.myscripts/.mkdocs.sh
 source ~/.myscripts/.dev.sh
+source ~/.myscripts/.prismatools.sh
 
 
 # sudo mv .pgsetup.sh       ./.myscripts/.pgsetup.sh
