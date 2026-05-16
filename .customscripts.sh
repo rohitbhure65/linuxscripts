@@ -131,3 +131,4 @@ alias olr35='ollama launch claude --model qwen3.5:latest'
 # Claude shortcuts
 alias cc="claude"
 alias ccp="claude ."
+

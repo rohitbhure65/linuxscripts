@@ -66,3 +66,13 @@ skillurl() {
 
   npx skillui --url "$url" --mode "$mode"
 }
+
+#####################################
+# TMUX
+#####################################
+# Auto-start tmux
+if command -v tmux >/dev/null 2>&1; then
+  if [ -z "$TMUX" ]; then
+    tmux attach-session -t main 2>/dev/null || tmux new-session -s main
+  fi
+fi
