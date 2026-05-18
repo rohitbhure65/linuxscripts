@@ -85,12 +85,11 @@ mkflutter() {
   # ════════════════════════════════════════════════════════════════
   # STEP 0: Project Name
   # ════════════════════════════════════════════════════════════════
-  # FIX: Correctly labelled as Step 0 (was "Step 1" in both name and SM sections)
   echo -e "${BOLD}${YELLOW}── Step 0: Project Name ──────────────────────────────────────${RESET}"
 
   CURRENT_DIR_NAME=$(basename "$(pwd)")
 
-  # FIX: Re-run guard — warn and abort if pubspec.yaml already exists
+  # Re-run guard — warn and abort if pubspec.yaml already exists
   if [[ -f "./pubspec.yaml" ]]; then
     echo -e "  ${RED}⚠  pubspec.yaml already exists in this directory.${RESET}"
     echo -e "  ${DIM}  Running mkflutter here will overwrite generated files.${RESET}"
@@ -189,7 +188,7 @@ mkflutter() {
   esac
 
   # ════════════════════════════════════════════════════════════════
-  # STEP 4: Features (select what you need)
+  # STEP 4: Features
   # ════════════════════════════════════════════════════════════════
   echo -e "${BOLD}${YELLOW}── Step 4: Features (select what you need) ───────────────────${RESET}"
   echo -e "${DIM}  Press ENTER to accept default (y). Enter n to skip.${RESET}"
@@ -260,6 +259,12 @@ mkflutter() {
   _ask "Dependency Injection (get_it + injectable)"    F_DI
   _ask "GoRouter for navigation"                       F_GOROUTER
   _ask "Auto Route (code gen routing)"                 F_AUTOROUTE
+  echo ""
+
+  echo -e "  ${BOLD}${MAGENTA}[ Monetization / Store ]${RESET}"
+  _ask "Google AdMob (google_mobile_ads)"              F_ADS
+  _ask "In-App Review prompt"                          F_IN_APP_REVIEW
+  _ask "In-App Update (Android)"                       F_IN_APP_UPDATE
   echo ""
 
   echo -e "  ${BOLD}${MAGENTA}[ Dev / Quality ]${RESET}"
@@ -351,6 +356,11 @@ mkflutter() {
   _yes "$F_GOROUTER"  && echo -e "    ${GREEN}✓${RESET} GoRouter"
   _yes "$F_AUTOROUTE" && echo -e "    ${GREEN}✓${RESET} Auto Route"
 
+  echo -e "  ${DIM}Monetization/Store:${RESET}"
+  _yes "$F_ADS"           && echo -e "    ${GREEN}✓${RESET} Google AdMob"
+  _yes "$F_IN_APP_REVIEW" && echo -e "    ${GREEN}✓${RESET} In-App Review"
+  _yes "$F_IN_APP_UPDATE" && echo -e "    ${GREEN}✓${RESET} In-App Update"
+
   echo -e "  ${DIM}Dev/Quality:${RESET}"
   _yes "$F_UNIT_TEST"        && echo -e "    ${GREEN}✓${RESET} Unit Tests"
   _yes "$F_WIDGET_TEST"      && echo -e "    ${GREEN}✓${RESET} Widget Tests"
@@ -372,30 +382,25 @@ mkflutter() {
   echo ""
 
   # ════════════════════════════════════════════════════════════════
-  # PRE-COMPUTE FLAGS FOR HEREDOC
+  # PRE-COMPUTE FLAGS
   # ════════════════════════════════════════════════════════════════
 
-  # ── Helper: emit a YAML dependency line only when non-empty ──────
-  # FIX: All _PKG_* variables are built as arrays then joined, so the
-  #      pubspec.yaml has no stray blank lines from unset variables.
-  #      We accumulate lines into _DEPS_MAIN and _DEPS_DEV arrays and
-  #      write them with a single printf at file-generation time.
   _DEPS_MAIN=()
   _DEPS_DEV=()
 
-  _dep()  { [[ -n "$1" ]] && _DEPS_MAIN+=("$1"); }
+  _dep()    { [[ -n "$1" ]] && _DEPS_MAIN+=("$1"); }
   _devdep() { [[ -n "$1" ]] && _DEPS_DEV+=("$1"); }
 
-# ── State Management ─────────────────────────────────────────────
+  # ── State Management ─────────────────────────────────────────────
   _dep ""
   _dep "  # ------- State Management --------"
   case "$SM_CHOICE" in
-    1) _dep "  flutter_bloc: ^9.1.0 # State management library"
-       _dep "  equatable: ^2.0.7 # Value equality for objects" ;;
-    2) _dep "  flutter_riverpod: ^2.6.1 # Reactive caching and data-binding"
-       _dep "  riverpod_annotation: ^2.6.1 # Annotations for Riverpod" ;;
-    3) _dep "  get: ^4.7.2 # Route, state, and dependency management" ;;
-    4) _dep "  provider: ^6.1.2 # Dependency injection and state management" ;;
+    1) _dep "  flutter_bloc: ^9.1.0               # State management library"
+       _dep "  equatable: ^2.0.7                  # Value equality for objects" ;;
+    2) _dep "  flutter_riverpod: ^2.6.1           # Reactive caching and data-binding"
+       _dep "  riverpod_annotation: ^2.6.1        # Annotations for Riverpod" ;;
+    3) _dep "  get: ^4.7.2                        # Route, state, and dependency management" ;;
+    4) _dep "  provider: ^6.1.2                   # Dependency injection and state management" ;;
   esac
 
   # ── Network ──────────────────────────────────────────────────────
@@ -404,10 +409,10 @@ mkflutter() {
     _dep "  # ------- Network --------"
   fi
   if [[ "$API_CHOICE" == "1" || "$API_CHOICE" == "5" ]]; then
-    _dep "  dio: ^5.9.0 # Powerful HTTP client for API calls"
-    _dep "  retrofit: ^4.4.1 # Dio client code generator for APIs"
+    _dep "  dio: ^5.9.0                           # Powerful HTTP client for API calls"
+    _dep "  retrofit: ^4.4.1                      # Dio client code generator for APIs"
   fi
-  [[ "$API_CHOICE" == "2" ]] && _dep "  http: ^1.3.0 # Basic HTTP client"
+  [[ "$API_CHOICE" == "2" ]] && _dep "  http: ^1.3.0            # Basic HTTP client"
   [[ "$API_CHOICE" == "4" ]] && _dep "  graphql_flutter: ^5.2.0 # GraphQL client"
 
   # ── Local Storage ────────────────────────────────────────────────
@@ -417,13 +422,13 @@ mkflutter() {
   fi
   case "$STORAGE_CHOICE" in
     # NOTE: hive + hive_flutter abandoned (3 yrs). Using hive_ce (Community Edition) — drop-in replacement, same API.
-    1) _dep "  hive_ce: ^2.10.1 # Lightweight NoSQL local database (Community Edition)"
-       _dep "  hive_ce_flutter: ^2.2.0 # Hive CE extension for Flutter" ;;
-    2) _dep "  shared_preferences: ^2.5.3 # Local key-value storage" ;;
-    3) _dep "  sqflite: ^2.4.2 # SQLite plugin for local database"
-       _dep "  path: ^1.9.1 # Path manipulation for database" ;;
-    4) _dep "  isar: ^3.1.0 # Super fast NoSQL database"
-       _dep "  isar_flutter_libs: ^3.1.0 # Core binaries for Isar" ;;
+    1) _dep "  hive_ce: ^2.10.1                   # Lightweight NoSQL local database (Community Edition)"
+       _dep "  hive_ce_flutter: ^2.2.0            # Hive CE extension for Flutter" ;;
+    2) _dep "  shared_preferences: ^2.5.3         # Local key-value storage" ;;
+    3) _dep "  sqflite: ^2.4.2                    # SQLite plugin for local database"
+       _dep "  path: ^1.9.1                       # Path manipulation for database" ;;
+    4) _dep "  isar: ^3.1.0                       # Super fast NoSQL database"
+       _dep "  isar_flutter_libs: ^3.1.0          # Core binaries for Isar" ;;
   esac
 
   # ── Firebase ─────────────────────────────────────────────────────
@@ -434,52 +439,48 @@ mkflutter() {
 
   $_NEEDS_FB_CORE && _dep ""
   $_NEEDS_FB_CORE && _dep "  # ------- Firebase --------"
-  $_NEEDS_FB_CORE && _dep "  firebase_core: ^3.12.1 # Required for any Firebase service"
-  _yes "$F_FIREBASE_AUTH"    && _dep "  firebase_auth: ^5.5.0 # User authentication (Login/Signup)"
-  _yes "$F_FIRESTORE"        && _dep "  cloud_firestore: ^5.6.0 # Firebase NoSQL database"
-  _yes "$F_FIREBASE_STORAGE" && _dep "  firebase_storage: ^12.4.0 # Firebase cloud file storage"
-  _yes "$F_CRASHLYTICS"      && _dep "  firebase_crashlytics: ^4.3.0 # App crash tracking"
-  _yes "$F_ANALYTICS"        && _dep "  firebase_analytics: ^11.4.0 # User tracking & events analytics"
-  _yes "$F_REMOTE_CONFIG"    && _dep "  firebase_remote_config: ^5.3.0 # Update app without app store"
-  _yes "$F_PUSH"             && _dep "  firebase_messaging: ^15.2.0 # Push notifications"
+  $_NEEDS_FB_CORE && _dep "  firebase_core: ^3.12.1                     # Required for any Firebase service"
+  _yes "$F_FIREBASE_AUTH"    && _dep "  firebase_auth: ^5.5.0           # User authentication (Login/Signup)"
+  _yes "$F_FIRESTORE"        && _dep "  cloud_firestore: ^5.6.0         # Firebase NoSQL database"
+  _yes "$F_FIREBASE_STORAGE" && _dep "  firebase_storage: ^12.4.0       # Firebase cloud file storage"
+  _yes "$F_CRASHLYTICS"      && _dep "  firebase_crashlytics: ^4.3.0    # App crash tracking"
+  _yes "$F_ANALYTICS"        && _dep "  firebase_analytics: ^11.4.0     # User tracking & events analytics"
+  _yes "$F_REMOTE_CONFIG"    && _dep "  firebase_remote_config: ^5.3.0  # Update app without app store"
+  _yes "$F_PUSH"             && _dep "  firebase_messaging: ^15.2.0     # Push notifications"
 
   # ── Auth ─────────────────────────────────────────────────────────
   if _yes "$F_OAUTH" || _yes "$F_BIOMETRIC"; then
     _dep ""
     _dep "  # ------- Auth --------"
   fi
-  _yes "$F_OAUTH"     && _dep "  google_sign_in: ^6.2.2 # Google login integration"
-  _yes "$F_BIOMETRIC" && _dep "  local_auth: ^2.3.0 # Fingerprint & Face ID login"
+  _yes "$F_OAUTH"     && _dep "  google_sign_in: ^6.2.2     # Google login integration"
+  _yes "$F_BIOMETRIC" && _dep "  local_auth: ^2.3.0         # Fingerprint & Face ID login"
 
   # ── Notifications ────────────────────────────────────────────────
   if _yes "$F_LOCAL_NOTIF"; then
     _dep ""
     _dep "  # ------- Notifications --------"
   fi
-  _yes "$F_LOCAL_NOTIF" && _dep "  flutter_local_notifications: ^18.0.1 # On-device notifications"
-
+  _yes "$F_LOCAL_NOTIF" && _dep "  flutter_local_notifications: ^18.0.1    # On-device notifications"
   # ── UI/UX ────────────────────────────────────────────────────────
   if _yes "$F_SPLASH" || _yes "$F_L10N"; then
     _dep ""
     _dep "  # ------- UI/UX --------"
   fi
-  _yes "$F_SPLASH" && _dep "  flutter_native_splash: ^2.4.3 # App launch screen handler"
-  _yes "$F_L10N"   && _dep "  easy_localization: ^3.0.7 # Multi-language support"
-
+  _yes "$F_SPLASH" && _dep "  flutter_native_splash: ^2.4.3    # App launch screen handler"
+  _yes "$F_L10N"   && _dep "  easy_localization: ^3.0.7        # Multi-language support"
   # ── Routing ──────────────────────────────────────────────────────
-  # NOTE: auto_route removed — conflicts with go_router and adds unnecessary codegen overhead.
   if _yes "$F_GOROUTER"; then
     _dep ""
     _dep "  # ------- Routing --------"
-    _dep "  go_router: ^14.8.0 # Declarative routing/navigation"
   fi
 
-  # ── DI ───────────────────────────────────────────────────────────
+    _dep "  go_router: ^14.8.0                    # Declarative routing/navigation"
   if _yes "$F_DI"; then
     _dep ""
     _dep "  # ------- Dependency Injection --------"
-    _dep "  get_it: ^8.0.3 # Dependency injection (Service Locator)"
-    _dep "  injectable: ^2.5.0 # Code generator for get_it"
+    _dep "  get_it: ^8.0.3                        # Dependency injection (Service Locator)"
+    _dep "  injectable: ^2.5.0                    # Code generator for get_it"
   fi
 
   # ── Media ────────────────────────────────────────────────────────
@@ -488,13 +489,13 @@ mkflutter() {
     _dep "  # ------- Media --------"
   fi
   _yes "$F_IMAGE_PICKER" && _dep "  image_picker: ^1.1.2 # Pick images from gallery or camera"
-  _yes "$F_FILE_PICKER"  && _dep "  file_picker: ^8.3.4 # Select documents & files"
+  _yes "$F_FILE_PICKER"  && _dep "  file_picker: ^8.3.4  # Select documents & files"
   if _yes "$F_VIDEO"; then
-    _dep "  video_player: ^2.9.2 # Low-level video playing"
-    _dep "  chewie: ^1.8.5 # Advanced video player UI"
+    _dep "  video_player: ^2.9.2                        # Low-level video playing"
+    _dep "  chewie: ^1.8.5 # Advanced video player UI   # Advanced video player UI"
   fi
-  _yes "$F_CAMERA" && _dep "  camera: ^0.11.0+2 # Device camera controls"
-  _yes "$F_PDF"    && _dep "  flutter_pdfview: ^1.4.0 # Show PDF files inside app"
+  _yes "$F_CAMERA" && _dep "  camera: ^0.11.0+2         # Device camera controls"
+  _yes "$F_PDF"    && _dep "  flutter_pdfview: ^1.4.0   # Show PDF files inside app"
 
   # ── Maps / Location ──────────────────────────────────────────────
   if _yes "$F_LOCATION" || _yes "$F_MAPS"; then
@@ -502,13 +503,14 @@ mkflutter() {
     _dep "  # ------- Maps & Location --------"
   fi
   if _yes "$F_LOCATION"; then
-    _dep "  geolocator: ^13.0.2 # Fetch current GPS location"
-    _dep "  geocoding: ^3.0.0 # Convert coordinates to addresses"
+    _dep "  geolocator: ^13.0.2           # Fetch current GPS location"
+    _dep "  geocoding: ^3.0.0             # Convert coordinates to addresses"
   fi
   _yes "$F_MAPS" && _dep "  google_maps_flutter: ^2.10.0 # Google Maps integration"
 
   # ── Device ───────────────────────────────────────────────────────
-  if _yes "$F_CONTACTS" || _yes "$F_QR" || _yes "$F_BLUETOOTH" || _yes "$F_DEEPLINK" || _yes "$F_SHARE" || _yes "$F_CONNECTIVITY" || _yes "$F_PERMISSIONS"; then
+  if _yes "$F_CONTACTS" || _yes "$F_QR" || _yes "$F_BLUETOOTH" || _yes "$F_DEEPLINK" \
+    || _yes "$F_SHARE" || _yes "$F_CONNECTIVITY" || _yes "$F_PERMISSIONS"; then
     _dep ""
     _dep "  # ------- Device --------"
   fi
@@ -525,73 +527,72 @@ mkflutter() {
     _dep ""
     _dep "  # ------- Payments --------"
   fi
-  _yes "$F_PAYMENT" && _dep "  razorpay_flutter: ^1.4.0 # Razorpay payment gateway"
-  _yes "$F_IAP"     && _dep "  in_app_purchase: ^3.2.0 # Store billing (IAP)"
+  _yes "$F_PAYMENT" && _dep "  razorpay_flutter: ^1.4.0    # Razorpay payment gateway"
+  _yes "$F_IAP"     && _dep "  in_app_purchase: ^3.2.0     # Store billing (IAP)"
 
   # ── Data ─────────────────────────────────────────────────────────
   if _yes "$F_CHARTS" || _yes "$F_EXCEL" || _yes "$F_PDF_GEN" || _yes "$F_QR_GEN"; then
     _dep ""
     _dep "  # ------- Data & Utilities --------"
   fi
-  _yes "$F_CHARTS"  && _dep "  fl_chart: ^0.70.2 # Drawing interactive charts"
-  _yes "$F_EXCEL"   && _dep "  excel: ^4.0.6 # Read & Write Excel files"
+  _yes "$F_CHARTS"  && _dep "  fl_chart: ^0.70.2   # Drawing interactive charts"
+  _yes "$F_EXCEL"   && _dep "  excel: ^4.0.6       # Read & Write Excel files"
   if _yes "$F_PDF_GEN"; then
-    _dep "  pdf: ^3.11.1 # Create PDF files programmatically"
-    _dep "  printing: ^5.13.4 # Print PDFs from device"
+    _dep "  pdf: ^3.11.1                          # Create PDF files programmatically"
+    _dep "  printing: ^5.13.4                     # Print PDFs from device"
   fi
-  _yes "$F_QR_GEN" && _dep "  qr_flutter: ^4.1.0 # Generate & show QR codes"
+  _yes "$F_QR_GEN" && _dep "  qr_flutter: ^4.1.0  # Generate & show QR codes"
 
-  # ── Logging / Crash ──────────────────────────────────────────────
-  # NOTE: sentry_flutter removed — firebase_crashlytics already handles crash reporting.
+  # ── Monetization / Store ─────────────────────────────────────────
+  if _yes "$F_ADS" || _yes "$F_IN_APP_REVIEW" || _yes "$F_IN_APP_UPDATE"; then
+    _dep ""
+    _dep "  # ------- Monetization & Store --------"
+  fi
+  _yes "$F_ADS"           && _dep "  google_mobile_ads: ^7.0.0  # Google AdMob for ads monetization"
+  _yes "$F_IN_APP_REVIEW" && _dep "  in_app_review: ^2.0.9      # Prompt users to review app in store"
+  _yes "$F_IN_APP_UPDATE" && _dep "  in_app_update: ^4.2.5      # Android in-app update flow"
+
+  # ── Logging ──────────────────────────────────────────────────────
   if _yes "$F_LOGGING"; then
     _dep ""
-    _dep "  # ------- Logging & Crash Reporting --------"
-    _dep "  logger: ^2.5.0 # Beautiful console logs"
+    _dep "  # ------- Logging --------"
+    _dep "  logger: ^2.5.0 # Simple logging utility"
   fi
 
-  # ── Always-on utils ──────────────────────────────────────────────
+  # ── Always-on core utils ──────────────────────────────────────────
+  # FIX: shared_preferences added only once here (not duplicated from storage choice)
+  # FIX: http added only once (not duplicated from API choice)
   _dep ""
   _dep "  # ------- Core Utilities --------"
-  _dep "  intl: ^0.20.2 # Date and number formatting"
-  _dep "  dartz: ^0.10.1 # Functional programming (Either, Option)"
-  _dep "  flutter_secure_storage: ^9.2.2 # Encrypted key-value storage (for tokens)"
-  _dep "  cached_network_image: ^3.4.1 # Cache images from network"
-  _dep "  flutter_screenutil: ^5.9.3 # Adapt UI to different screen sizes"
-  _dep "  lottie: ^3.2.0 # Beautiful After Effects animations"
-  _dep ""
-  _dep "  # ------- Ads & Monetization --------"
-  _dep "  google_mobile_ads: ^7.0.0 # Google Mobile Ads (AdMob) integration"
-  _dep ""
-  _dep "  # ------- Local Storage (Simple) --------"
-  _dep "  shared_preferences: ^2.3.3 # Simple key-value storage for app settings"
-  _dep ""
-  _dep "  # ------- App Store Utilities --------"
-  _dep "  in_app_review: ^2.0.9 # Native in-app rating dialog"
-  _dep "  in_app_update: ^4.2.5 # In-app updates for Android"
-  _dep ""
-  _dep "  # ------- HTTP Client (Simple) --------"
-  _dep "  http: ^1.6.0 # Simple HTTP client for basic API calls"
-  _dep ""
-  _dep "  # ------- App Store Utilities --------"
-  _dep "  get: ^4.7.3"
+  _dep "  intl: ^0.20.2                           # Date and number formatting"
+  _dep "  dartz: ^0.10.1                          # Functional programming (Either, Option)"
+  _dep "  flutter_secure_storage: ^9.2.2          # Encrypted key-value storage (for tokens)"
+  _dep "  cached_network_image: ^3.4.1            # Cache images from network"
+  _dep "  flutter_screenutil: ^5.9.3              # Adapt UI to different screen sizes"
+  _dep "  lottie: ^3.2.0                          # Beautiful After Effects animations"
+  # shared_preferences only if not already added by storage choice
+  [[ "$STORAGE_CHOICE" != "2" ]] && _dep "  shared_preferences: ^2.3.3        # Local key-value storage"
+  # http only if not already added by API choice
+  [[ "$API_CHOICE" != "2" ]] && _dep "  http: ^1.6.0                          # Basic HTTP client"
+  # equatable only if not already added by SM choice
+  [[ "$SM_CHOICE" != "1" ]] && _dep "  equatable: ^2.0.7                 # Value equality for objects"
 
   # ── Dev dependencies ─────────────────────────────────────────────
   local _NEEDS_BUILD_RUNNER=false
-  _yes "$F_DI"                                        && _NEEDS_BUILD_RUNNER=true
+  _yes "$F_DI"                                          && _NEEDS_BUILD_RUNNER=true
   [[ "$STORAGE_CHOICE" == "1" || "$STORAGE_CHOICE" == "4" ]] && _NEEDS_BUILD_RUNNER=true
-  [[ "$API_CHOICE" == "1" || "$API_CHOICE" == "5" ]]  && _NEEDS_BUILD_RUNNER=true
+  [[ "$API_CHOICE" == "1" || "$API_CHOICE" == "5" ]]    && _NEEDS_BUILD_RUNNER=true
 
-  $_NEEDS_BUILD_RUNNER && _devdep "  build_runner: ^2.4.13 # Runs code generators"
-  _yes "$F_DI" && _devdep "  injectable_generator: ^2.6.0 # Code gen for injectable"
-  # NOTE: auto_route_generator removed — auto_route removed
-  [[ "$STORAGE_CHOICE" == "1" ]] && _devdep "  hive_ce_generator: ^1.11.1 # Code gen for Hive CE"
-  [[ "$STORAGE_CHOICE" == "4" ]] && _devdep "  isar_generator: ^3.1.0 # Code gen for Isar"
+  $_NEEDS_BUILD_RUNNER && _devdep "  build_runner: ^2.4.13            # Code generator runner"
+  _yes "$F_DI"          && _devdep "  injectable_generator: ^2.6.0   # Code generator for get_it dependency"
+  [[ "$STORAGE_CHOICE" == "1" ]] && _devdep "  hive_ce_generator: ^1.11.1   # Code generator for Hive CE (Community Edition)"
+  [[ "$STORAGE_CHOICE" == "4" ]] && _devdep "  isar_generator: ^3.1.0      # Code generator for Isar database"
   if [[ "$API_CHOICE" == "1" || "$API_CHOICE" == "5" ]]; then
-    _devdep "  retrofit_generator: ^10.2.6 # Code gen for Retrofit"
+    _devdep "  retrofit_generator: ^10.2.6 # Code generator for Retrofit APIs"
   fi
   if _yes "$F_UNIT_TEST"; then
-    _devdep "  mockito: ^5.4.4 # Mock dependencies for testing"
-    _devdep "  bloc_test: ^10.0.0 # Testing utilities for BLoC"
+    _devdep "  mockito: ^5.4.4                    # Mock dependencies for testing"
+    _devdep "  bloc_test: ^10.0.0                 # Testing utilities for BLoC"
   fi
 
   # ── .env conditional lines ───────────────────────────────────────
@@ -603,7 +604,7 @@ mkflutter() {
   _ASSET_TRANSLATIONS=""
   _yes "$F_L10N" && _ASSET_TRANSLATIONS="    - assets/translations/"
 
-  # ── README feature/route/config labels ───────────────────────────
+  # ── README / ARCHITECTURE labels ─────────────────────────────────
   _README_FEATURES="auth, profile, settings"
   _yes "$F_PUSH"    && _README_FEATURES="${_README_FEATURES}, notifications"
   _yes "$F_PAYMENT" && _README_FEATURES="${_README_FEATURES}, payment"
@@ -641,11 +642,8 @@ mkflutter() {
       _SDK_MIN="${_DART_MAJOR}.${_DART_MINOR}.0"
     fi
   fi
-  # FIX: SDK constraint written as plain string; surrounding quotes are part of YAML value
   _SDK_CONSTRAINT=">=${_SDK_MIN} <$(( $(echo "$_SDK_MIN" | cut -d. -f1) + 1 )).0.0"
 
-  # ── Firebase Android BOM version ─────────────────────────────────
-  # FIX: Pinned to a real released version (34.x line is current as of 2025)
   _FIREBASE_BOM_VERSION="33.7.0"
 
   # ════════════════════════════════════════════════════════════════
@@ -677,15 +675,16 @@ mkflutter() {
     "${B}/lib/core/network/interceptors" \
     "${B}/lib/core/cache" \
     "${B}/lib/core/services" \
+    "${B}/lib/core/services/firebase" \
     "${B}/lib/core/theme" \
     "${B}/lib/core/utils/extensions" \
     "${B}/lib/core/utils/formatters" \
     "${B}/lib/core/utils/validators" \
+    "${B}/lib/core/utils/initializers" \
     "${B}/lib/core/utils/helpers" \
     "${B}/lib/core/di" \
     "${B}/lib/core/resources"
   _yes "$F_LOGGING" && mkdir -p "${B}/lib/core/logger"
-
 
   for FEATURE in auth profile settings; do
     mkdir -p \
@@ -746,7 +745,6 @@ mkflutter() {
   ( _yes "$F_GOROUTER" || _yes "$F_AUTOROUTE" ) && mkdir -p "${B}/lib/routes/guards"
 
   mkdir -p "${B}/lib/config"
-  # _yes "$F_FLAVORS" && mkdir -p "${B}/lib/config/flavors"
 
   _yes "$F_UNIT_TEST" && mkdir -p \
     "${B}/test/unit/features/auth" \
@@ -769,11 +767,10 @@ mkflutter() {
   done
   _yes "$F_L10N" && touch "${B}/assets/translations/.gitkeep"
 
-  _dart "lib/core/constants/app_features.dart"; cat > "${B}/lib/core/constants/app_features.dart" << EOF
-// ── FEATURE FLAGS ────────────────────────────────────────────
+  # ── constants ────────────────────────────────────────────────────
+  _dart "lib/core/constants/app_features.dart"
+  cat > "${B}/lib/core/constants/app_features.dart" << EOF
 abstract final class AppFeatures {
-
-  // — UI / Theming —
   static const bool enableDarkMode          = true;
   static const bool enableSystemTheme       = true;
   static const bool enableCustomFonts       = true;
@@ -784,17 +781,18 @@ abstract final class AppFeatures {
   static const bool showPerformanceOverlay  = false;
 
   // — Auth —
-  static const bool enableGoogleSignIn     = true;
-  static const bool enableAppleSignIn      = true;
-  static const bool enableEmailAuth        = true;
-  static const bool enableGuestMode        = false;
-  static const bool enableBiometricLock    = true;
-  static const bool enableAutoLogout       = true;
+  static const bool enableGoogleSignIn      = $( _yes "$F_OAUTH" && echo true || echo false );
+  static const bool enableAppleSignIn       = $( _yes "$F_OAUTH" && echo true || echo false );
+  static const bool enableEmailAuth         = $( _yes "$F_JWT" && echo true || echo false );
+  static const bool enableGuestMode         = false;
+  static const bool enableBiometricLock     = $( _yes "$F_BIOMETRIC" && echo true || echo false );
+  static const bool enableAutoLogout        = true;
 
   // — Notifications —
-  static const bool enableNotifications      = true;
-  static const bool enablePushNotifications  = true;
-  static const bool enableLocalNotifications = true;
+  static const bool enableNotifications     = $( _yes "$F_PUSH" && echo true || echo false );
+
+  static const bool enablePushNotifications = $( _yes "$F_PUSH" && echo true || echo false );
+  static const bool enableLocalNotifications= $( _yes "$F_LOCAL_NOTIF" && echo true || echo false );
   static const bool enableEmailNotifications = false;
   static const bool enableInAppBanner        = true;
   static const bool enableNotificationBadge  = true;
@@ -807,7 +805,7 @@ abstract final class AppFeatures {
   static const bool enableAiTranslation    = false;
 
   // — Storage / Sync —
-  static const bool enableOfflineMode      = true;
+  static const bool enableOfflineMode       = true;
   static const bool enableCloudSync        = false;
   static const bool enableGoogleDrive      = false;
   static const bool enableDropbox          = false;
@@ -815,7 +813,7 @@ abstract final class AppFeatures {
   static const bool enableAutoBackup       = false;
   static const bool enableLocalStorage     = true;
 
-  // — Sharing & Export —
+ // — Sharing & Export —
   static const bool enableShareSheet       = true;
   static const bool enableQrShare          = false;
   static const bool enableLinkShare        = false;
@@ -824,29 +822,24 @@ abstract final class AppFeatures {
   static const bool enableExportExcel      = false;
 
   // — Analytics & Monitoring —
-  static const bool enableAnalytics          = true;
-  static const bool enableCrashReporting     = true;
+  static const bool enableAnalytics         = $( _yes "$F_ANALYTICS" && echo true || echo false );
+  static const bool enableCrashReporting    = $( _yes "$F_CRASHLYTICS" && echo true || echo false );
+  static const bool enableLogging           = $( _yes "$F_LOGGING" && echo true || echo false );
   static const bool enablePerformanceMonitor = false;
   static const bool enableUserTracking       = false;
   static const bool enableHeatmaps           = false;
   static const bool enableABTesting          = false;
 
-  // — Monetization —
+
+    // — Monetization —
   static const bool enableSubscription     = true;
-  static const bool enableInAppPurchase    = true;
   static const bool enableFreeTier         = true;
-  static const bool enableAds              = false;
   static const bool enableReferralProgram  = false;
   static const bool enablePromoCode        = false;
+  static const bool enableAds               = $( _yes "$F_ADS" && echo true || echo false );
+  static const bool enableInAppPurchase     = $( _yes "$F_IAP" && echo true || echo false );
 
-  // — Developer / QA —
-  static const bool enableLogging          = false;
-  static const bool enableNetworkLogger    = false;
-  static const bool enableMockApi          = false;
-  static const bool enableShakeToReport    = false;
-  static const bool enableInspector        = false;
-
-  // ── Computed helpers ──
+    // ── Computed helpers ──
   static bool get isAiEnabled    => enableAiSummary || enableAiChat;
   static bool get isCloudEnabled => enableCloudSync || enableGoogleDrive
                                   || enableDropbox  || enableOneDrive;
@@ -855,8 +848,8 @@ abstract final class AppFeatures {
 }
 EOF
 
-  _dart "lib/core/constants/app_assets.dart"; cat > "${B}/lib/core/constants/app_assets.dart" << 'EOF'
-  // ── 7. ASSETS ────────────────────────────────────────────────
+  _dart "lib/core/constants/app_assets.dart"
+  cat > "${B}/lib/core/constants/app_assets.dart" << 'EOF'
 abstract final class AppAssets {
   // — Base Paths —
   // ignore: unused_field
@@ -938,20 +931,20 @@ abstract final class AppAssets {
 }
 EOF
 
-  _dart "lib/core/constants/app_pagination.dart"; cat > "${B}/lib/core/constants/app_pagination.dart" << EOF
-// ── PAGINATION ───────────────────────────────────────────
+  _dart "lib/core/constants/app_pagination.dart"
+  cat > "${B}/lib/core/constants/app_pagination.dart" << 'EOF'
 abstract final class AppPagination {
-  static const int defaultPageSize  = 20;
-  static const int smallPageSize    = 10;
-  static const int largePageSize    = 50;
-  static const int firstPage        = 1;
-  static const int scrollThreshold  = 200;
-  static const int maxOfflineItems  = 100;
+  static const int defaultPageSize = 20;
+  static const int smallPageSize   = 10;
+  static const int largePageSize   = 50;
+  static const int firstPage       = 1;
+  static const int scrollThreshold = 200;
+  static const int maxOfflineItems = 100;
 }
 EOF
 
-  _dart "lib/core/constants/app_layout.dart"; cat > "${B}/lib/core/constants/app_layout.dart" << EOF
-// ── UI / LAYOUT ───────────────────────────────────────────
+  _dart "lib/core/constants/app_layout.dart"
+  cat > "${B}/lib/core/constants/app_layout.dart" << 'EOF'
 import 'package:flutter/material.dart';
 
 abstract final class AppLayout {
@@ -1153,7 +1146,8 @@ abstract final class AppLayout {
 }
 EOF
 
-  _dart "lib/core/constants/app_api.dart"; cat > "${B}/lib/core/constants/app_api.dart" << EOF
+  _dart "lib/core/constants/app_api.dart"
+  cat > "${B}/lib/core/constants/app_api.dart" << EOF
 // ─────────────────────────────────────────────────────────────
 //  AppApi — Network configuration
 //  Single source of truth for URLs, timeouts, headers & retries.
@@ -1191,8 +1185,8 @@ abstract final class AppApi {
 }
 EOF
 
-  _dart "lib/core/constants/app_storage.dart"; cat > "${B}/lib/core/constants/app_storage.dart" << EOF
-// ── STORAGE / CACHE KEYS ───────────────────────────────────
+  _dart "lib/core/constants/app_storage.dart"
+  cat > "${B}/lib/core/constants/app_storage.dart" << 'EOF'
 abstract final class AppStorage {
   // Auth
   static const String keyAuthToken     = 'auth_token';
@@ -1228,8 +1222,8 @@ abstract final class AppStorage {
 
 EOF
 
-  _dart "lib/core/constants/app_typography.dart"; cat > "${B}/lib/core/constants/app_typography.dart" << EOF
-// ── TYPOGRAPHY ────────────────────────────────────────────
+  _dart "lib/core/constants/app_typography.dart"
+  cat > "${B}/lib/core/constants/app_typography.dart" << 'EOF'
 import 'dart:ui';
 
 abstract final class AppTypography {
@@ -1268,11 +1262,10 @@ abstract final class AppTypography {
   static const double trackingWidest =  1.5;
   static const double trackingCaps   =  2.0;   // ALL CAPS labels
 }
-
 EOF
 
-  _dart "lib/core/constants/app_anim.dart"; cat > "${B}/lib/core/constants/app_anim.dart" << EOF
-// ── ANIMATION ─────────────────────────────────────────────
+  _dart "lib/core/constants/app_anim.dart"
+  cat > "${B}/lib/core/constants/app_anim.dart" << 'EOF'
 import 'package:flutter/material.dart';
 
 abstract final class AppAnim {
@@ -1296,11 +1289,14 @@ abstract final class AppAnim {
   static const Duration snackbarDuration   = Duration(seconds: 3);
   static const Duration tooltipDelay       = Duration(milliseconds: 500);
   static const Duration debounce           = Duration(milliseconds: 400);
+  static const Duration longPressDelay     = Duration(milliseconds: 400);
+  static const Duration doubleTapWindow    = Duration(milliseconds: 300);
+  static const Duration autoScrollDelay    = Duration(milliseconds: 100);
 }
 EOF
 
-  _dart "lib/core/constants/app_durations.dart"; cat > "${B}/lib/core/constants/app_durations.dart" << EOF
-// ── DURATIONS (timeouts / debounce) ──────────────────────
+  _dart "lib/core/constants/app_durations.dart"
+  cat > "${B}/lib/core/constants/app_durations.dart" << 'EOF'
 abstract final class AppDurations {
   static const Duration searchDebounce    = Duration(milliseconds: 400);
   static const Duration inputDebounce     = Duration(milliseconds: 300);
@@ -1316,7 +1312,8 @@ abstract final class AppDurations {
 }
 EOF
 
-  _dart "lib/core/constants/app_routes.dart"; cat > "${B}/lib/core/constants/app_routes.dart" << EOF
+  _dart "lib/core/constants/app_routes.dart"
+  cat > "${B}/lib/core/constants/app_routes.dart" << 'EOF'
 abstract final class AppRoutes {
   static const String splash        = '/';
   static const String onboarding    = '/onboarding';
@@ -1339,10 +1336,10 @@ abstract final class AppRoutes {
   static const String terms         = '/terms';
   static const String about         = '/about';
 }
-
 EOF
 
-  _dart "lib/core/constants/app_regex.dart"; cat > "${B}/lib/core/constants/app_regex.dart" << EOF
+  _dart "lib/core/constants/app_regex.dart"
+  cat > "${B}/lib/core/constants/app_regex.dart" << 'EOF'
 abstract final class AppRegex {
   static final RegExp email    = RegExp(r'^[\w.+-]+@[\w-]+\.[a-z]{2,}$', caseSensitive: false);
   static final RegExp phone    = RegExp(r'^\+?[0-9]{7,15}$');
@@ -1368,45 +1365,21 @@ abstract final class AppRegex {
 }
 EOF
 
-  _dart "lib/core/constants/app_constants.dart"; cat > "${B}/lib/core/constants/app_constants.dart" << EOF
-export 'app_meta.dart';
-export 'app_api.dart';
-export 'app_storage.dart';
-export 'app_layout.dart';
-export 'app_typography.dart';
-export 'app_anim.dart';
-export 'app_assets.dart';
-export 'app_routes.dart';
-export 'app_features.dart';
-export 'app_regex.dart';
-export 'app_durations.dart';
-export 'app_pagination.dart';
-EOF
-
-  _dart "lib/core/constants/app_meta.dart"; cat > "${B}/lib/core/constants/app_meta.dart" << EOF
-// ─────────────────────────────────────────────────────────────
-// APP CONSTANTS  –  Single source of truth for all app-wide
-// configuration. UI/logic code sirf yahan se values le.
-// ─────────────────────────────────────────────────────────────
-
-// ── APPLICATION METADATA ──────────────────────────────────
+  _dart "lib/core/constants/app_meta.dart"
+  cat > "${B}/lib/core/constants/app_meta.dart" << EOF
 abstract final class AppMeta {
   static const String name        = '${PROJECT_NAME}';
   static const String tagline     = '';
   static const String packageName = '${APP_ID}';
   static const String version     = '1.0.0';
-//static const String semVer      = '$version+$buildNumber';
-
   static const String supportEmail  = '';
   static const String privacyUrl    = '';
   static const String termsUrl      = '';
   static const String websiteUrl    = '';
   static const String playStoreUrl  =
       'https://play.google.com/store/apps/details?id=${APP_ID}';
-//static const String appStoreUrl   =
-//    'https://apps.apple.com/app/flitpdf/id000000000';
 
-// ── Social links ────────────────────────────────────────────
+  // ── Social links ────────────────────────────────────────────
   static const String twitterUrl   = '';
   static const String instagramUrl = '';
   static const String linkedinUrl  = '';
@@ -1414,13 +1387,10 @@ abstract final class AppMeta {
 }
 EOF
 
-  _dart "lib/core/constants/app_colors.dart"; cat > "${B}/lib/core/constants/app_colors.dart" << EOF
+  _dart "lib/core/constants/app_colors.dart"
+  cat > "${B}/lib/core/constants/app_colors.dart" << 'EOF'
 import 'package:flutter/material.dart';
 
-// ─────────────────────────────────────────────
-// 1. RAW PALETTE  –  single source of truth
-//    only change hex values.
-// ─────────────────────────────────────────────
 abstract final class _Palette {
   // Red ramp
   static const Color red300 = Color(0xFFFF6F60);
@@ -1454,10 +1424,6 @@ abstract final class _Palette {
   static const Color blue500    = Color(0xFF3B82F6);
 }
 
-// ─────────────────────────────────────────────
-// 2. SEMANTIC TOKENS  –  context-aware aliases
-//    UI code use this, do not use direct _Palette
-// ─────────────────────────────────────────────
 abstract final class AppColors {
   AppColors._();
 
@@ -1519,9 +1485,62 @@ abstract final class AppColors {
 }
 EOF
 
+  _dart "lib/core/constants/app_constants.dart"
+  cat > "${B}/lib/core/constants/app_constants.dart" << 'EOF'
+export 'app_meta.dart';
+export 'app_api.dart';
+export 'app_storage.dart';
+export 'app_layout.dart';
+export 'app_typography.dart';
+export 'app_anim.dart';
+export 'app_assets.dart';
+export 'app_routes.dart';
+export 'app_features.dart';
+export 'app_regex.dart';
+export 'app_durations.dart';
+export 'app_pagination.dart';
+export 'enums/app_enums.dart';
+EOF
 
-# ── 1. THEME ENUM ────────────────────────────────────────────
-_dart "lib/core/constants/enums/app_theme_mode.dart"; cat > "${B}/lib/core/constants/enums/app_theme_mode.dart" << EOF
+  # ── enums ────────────────────────────────────────────────────────
+  _dart "lib/core/constants/enums/app_enums.dart"
+  cat > "${B}/lib/core/constants/enums/app_enums.dart" << 'EOF'
+// ── Barrel export ────────────────────
+export 'app_theme_mode.dart';
+export 'auth_status.dart';
+export 'auth_provider.dart';
+export 'otp_type.dart';
+export 'user_role.dart';
+export 'user_status.dart';
+export 'gender.dart';
+export 'api_status.dart';
+export 'network_status.dart';
+export 'http_method.dart';
+export 'api_error_type.dart';
+export 'file_type.dart';
+export 'sort_order.dart';
+export 'view_mode.dart';
+export 'upload_status.dart';
+export 'download_status.dart';
+export 'notification_type.dart';
+export 'notification_priority.dart';
+export 'subscription_plan.dart';
+export 'payment_status.dart';
+export 'payment_method.dart';
+export 'page_state.dart';
+export 'snackbar_type.dart';
+export 'dialog_type.dart';
+export 'button_state.dart';
+export 'app_locale.dart';
+export 'app_permission.dart';
+export 'permission_status.dart';
+export 'app_environment.dart';
+EOF
+
+  _dart "lib/core/errors/exceptions.dart"
+
+  _dart "lib/core/constants/enums/app_theme_mode.dart"
+  cat > "${B}/lib/core/constants/enums/app_theme_mode.dart" << 'EOF'
 enum AppThemeMode {
   light,
   dark,
@@ -1539,8 +1558,8 @@ enum AppThemeMode {
 }
 EOF
 
-# ── 2. AUTH ENUMS ────────────────────────────────────────────
-_dart "lib/core/constants/enums/auth_status.dart"; cat > "${B}/lib/core/constants/enums/auth_status.dart" << EOF
+  _dart "lib/core/constants/enums/auth_status.dart"
+  cat > "${B}/lib/core/constants/enums/auth_status.dart" << 'EOF'
 enum AuthStatus {
   initial,
   authenticated,
@@ -1555,7 +1574,8 @@ enum AuthStatus {
 }
 EOF
 
-_dart "lib/core/constants/enums/auth_provider.dart"; cat > "${B}/lib/core/constants/enums/auth_provider.dart" << EOF
+  _dart "lib/core/constants/enums/auth_provider.dart"
+  cat > "${B}/lib/core/constants/enums/auth_provider.dart" << 'EOF'
 enum AuthProvider {
   email,
   google,
@@ -1607,7 +1627,8 @@ enum UserRole {
 }
 EOF
 
-_dart "lib/core/constants/enums/user_status.dart"; cat > "${B}/lib/core/constants/enums/user_status.dart" << EOF
+  _dart "lib/core/constants/enums/user_status.dart"
+  cat > "${B}/lib/core/constants/enums/user_status.dart" << 'EOF'
 enum UserStatus {
   active,
   inactive,
@@ -1655,7 +1676,8 @@ enum ApiStatus {
 }
 EOF
 
-_dart "lib/core/constants/enums/network_status.dart"; cat > "${B}/lib/core/constants/enums/network_status.dart" << EOF
+  _dart "lib/core/constants/enums/network_status.dart"
+  cat > "${B}/lib/core/constants/enums/network_status.dart" << 'EOF'
 enum NetworkStatus {
   online,
   offline,
@@ -2029,202 +2051,145 @@ enum AppEnvironment {
     AppEnvironment.prod    => 'Production',
   };
 }
+class ValidationException implements Exception {
+  final String message;
+  const ValidationException(this.message);
+}
 EOF
 
-# ── BARREL EXPORT ────────────────────────────────────────────
-_dart "lib/core/constants/enums/app_enums.dart"; cat > "${B}/lib/core/constants/enums/app_enums.dart" << EOF
-// ── Barrel export ────────────────────
-export 'app_theme_mode.dart';
-export 'auth_status.dart';
-export 'auth_provider.dart';
-export 'otp_type.dart';
-export 'user_role.dart';
-export 'user_status.dart';
-export 'gender.dart';
-export 'api_status.dart';
-export 'network_status.dart';
-export 'http_method.dart';
-export 'api_error_type.dart';
-export 'file_type.dart';
-export 'sort_order.dart';
-export 'view_mode.dart';
-export 'upload_status.dart';
-export 'download_status.dart';
-export 'notification_type.dart';
-export 'notification_priority.dart';
-export 'subscription_plan.dart';
-export 'payment_status.dart';
-export 'payment_method.dart';
-export 'page_state.dart';
-export 'snackbar_type.dart';
-export 'dialog_type.dart';
-export 'button_state.dart';
-export 'app_locale.dart';
-export 'app_permission.dart';
-export 'permission_status.dart';
-export 'app_environment.dart';
-EOF
-
-  _dart "lib/core/errors/exceptions.dart"
-
+  # FIX: failures.dart no longer imports equatable — uses plain Dart equality
   _dart "lib/core/errors/failures.dart"
+  cat > "${B}/lib/core/errors/failures.dart" << 'EOF'
+import 'package:equatable/equatable.dart';
+
+abstract class Failure extends Equatable {
+  final String message;
+  const Failure(this.message);
+
+  @override
+  List<Object?> get props => [message];
+}
+
+class ServerFailure extends Failure {
+  const ServerFailure([super.message = 'Server Error']);
+}
+
+class CacheFailure extends Failure {
+  const CacheFailure([super.message = 'Cache Error']);
+}
+
+class NetworkFailure extends Failure {
+  const NetworkFailure([super.message = 'No Internet Connection']);
+}
+
+class ValidationFailure extends Failure {
+  const ValidationFailure(super.message);
+}
+EOF
+
   _dart "lib/core/errors/error_messages.dart"
 
-if [[ "$API_CHOICE" == "1" || "$API_CHOICE" == "5" ]]; then
-  _dart "lib/core/network/api/api_client.dart"; cat > "${B}/lib/core/network/api/api_client.dart" << 'EOF'
+  # ── network ──────────────────────────────────────────────────────
+  if [[ "$API_CHOICE" == "1" || "$API_CHOICE" == "5" ]]; then
+    # FIX: package name uses ${PROJECT_NAME} not hardcoded 'rohit'
+    _dart "lib/core/network/api/api_client.dart"
+    cat > "${B}/lib/core/network/api/api_client.dart" << EOF
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
-import 'package:rohit/core/constants/app_api.dart';
+import 'package:${PROJECT_NAME}/core/constants/app_api.dart';
 
-// ─────────────────────────────────────────────────────────────
-//  ApiException
-// ─────────────────────────────────────────────────────────────
 class ApiException implements Exception {
   const ApiException(this.message, {this.statusCode});
-
   final String message;
   final int? statusCode;
-
-  bool get isUnauthorized  => statusCode == 401;
-  bool get isForbidden     => statusCode == 403;
-  bool get isNotFound      => statusCode == 404;
-  bool get isServerError   => statusCode != null && statusCode! >= 500;
-
+  bool get isUnauthorized => statusCode == 401;
+  bool get isForbidden    => statusCode == 403;
+  bool get isNotFound     => statusCode == 404;
+  bool get isServerError  => statusCode != null && statusCode! >= 500;
   @override
-  String toString() => 'ApiException($statusCode): $message';
+  String toString() => 'ApiException(\$statusCode): \$message';
 }
 
-// ─────────────────────────────────────────────────────────────
-//  TokenProvider — implement with your Firebase / JWT logic
-// ─────────────────────────────────────────────────────────────
 abstract class TokenProvider {
   Future<String?> getAccessToken();
   Future<String?> refreshAccessToken();
 }
 
-// ─────────────────────────────────────────────────────────────
-//  ApiClient
-// ─────────────────────────────────────────────────────────────
 class ApiClient {
-  ApiClient._internal();
-  static final ApiClient _instance = ApiClient._internal();
-  factory ApiClient() => _instance;
+  ApiClient();
 
   TokenProvider? _tokenProvider;
 
-  /// Call once in main() / DI setup before any requests.
   void configure({TokenProvider? tokenProvider}) {
     _tokenProvider = tokenProvider;
   }
 
-  // ── HTTP client (connection-pooled) ──────────────────────
   static http.Client? _client;
   http.Client get _httpClient => _client ??= http.Client();
 
-  // ── Build headers ────────────────────────────────────────
   Future<Map<String, String>> _buildHeaders({bool auth = false}) async {
     final headers = <String, String>{
       AppApi.headerContentType: AppApi.valueJson,
-      AppApi.headerAccept: AppApi.valueJson,
+      AppApi.headerAccept:      AppApi.valueJson,
     };
     if (auth && _tokenProvider != null) {
       final token = await _tokenProvider!.getAccessToken();
-      if (token != null) {
-        headers[AppApi.headerAuth] = '${AppApi.valueBearer}$token';
-      }
+      if (token != null) headers[AppApi.headerAuth] = '\${AppApi.valueBearer}\$token';
     }
     return headers;
   }
 
-  // ─────────────────────────────────────────────────────────
-  //  Public methods
-  // ─────────────────────────────────────────────────────────
-
-  Future<dynamic> get(
-    String endpoint, {
-    Map<String, String>? queryParams,
-    bool auth = false,
-  }) =>
+  Future<dynamic> get(String endpoint, {Map<String, String>? queryParams, bool auth = false}) =>
       _withRetry(() async {
-        Uri uri = Uri.parse('${AppApi.baseUrl}$endpoint');
-        if (queryParams != null) {
-          uri = uri.replace(queryParameters: queryParams);
-        }
+        Uri uri = Uri.parse('\${AppApi.baseUrl}\$endpoint');
+        if (queryParams != null) uri = uri.replace(queryParameters: queryParams);
         final res = await _httpClient
             .get(uri, headers: await _buildHeaders(auth: auth))
             .timeout(AppApi.receiveTimeout);
         return _handleResponse(res);
       });
 
-  Future<dynamic> post(
-    String endpoint, {
-    Map<String, dynamic>? body,
-    bool auth = false,
-  }) =>
+  Future<dynamic> post(String endpoint, {Map<String, dynamic>? body, bool auth = false}) =>
       _withRetry(() async {
-        final uri = Uri.parse('${AppApi.baseUrl}$endpoint');
+        final uri = Uri.parse('\${AppApi.baseUrl}\$endpoint');
         final res = await _httpClient
-            .post(
-              uri,
-              headers: await _buildHeaders(auth: auth),
-              body: body != null ? jsonEncode(body) : null,
-            )
+            .post(uri, headers: await _buildHeaders(auth: auth),
+                body: body != null ? jsonEncode(body) : null)
             .timeout(AppApi.sendTimeout);
         return _handleResponse(res);
       });
 
-  Future<dynamic> put(
-    String endpoint, {
-    Map<String, dynamic>? body,
-    bool auth = false,
-  }) =>
+  Future<dynamic> put(String endpoint, {Map<String, dynamic>? body, bool auth = false}) =>
       _withRetry(() async {
-        final uri = Uri.parse('${AppApi.baseUrl}$endpoint');
+        final uri = Uri.parse('\${AppApi.baseUrl}\$endpoint');
         final res = await _httpClient
-            .put(
-              uri,
-              headers: await _buildHeaders(auth: auth),
-              body: body != null ? jsonEncode(body) : null,
-            )
+            .put(uri, headers: await _buildHeaders(auth: auth),
+                body: body != null ? jsonEncode(body) : null)
             .timeout(AppApi.sendTimeout);
         return _handleResponse(res);
       });
 
-  Future<dynamic> patch(
-    String endpoint, {
-    Map<String, dynamic>? body,
-    bool auth = false,
-  }) =>
+  Future<dynamic> patch(String endpoint, {Map<String, dynamic>? body, bool auth = false}) =>
       _withRetry(() async {
-        final uri = Uri.parse('${AppApi.baseUrl}$endpoint');
+        final uri = Uri.parse('\${AppApi.baseUrl}\$endpoint');
         final res = await _httpClient
-            .patch(
-              uri,
-              headers: await _buildHeaders(auth: auth),
-              body: body != null ? jsonEncode(body) : null,
-            )
+            .patch(uri, headers: await _buildHeaders(auth: auth),
+                body: body != null ? jsonEncode(body) : null)
             .timeout(AppApi.sendTimeout);
         return _handleResponse(res);
       });
 
-  Future<dynamic> delete(
-    String endpoint, {
-    bool auth = false,
-  }) =>
+  Future<dynamic> delete(String endpoint, {bool auth = false}) =>
       _withRetry(() async {
-        final uri = Uri.parse('${AppApi.baseUrl}$endpoint');
+        final uri = Uri.parse('\${AppApi.baseUrl}\$endpoint');
         final res = await _httpClient
             .delete(uri, headers: await _buildHeaders(auth: auth))
             .timeout(AppApi.receiveTimeout);
         return _handleResponse(res);
       });
-
-  // ─────────────────────────────────────────────────────────
-  //  Retry
-  // ─────────────────────────────────────────────────────────
 
   Future<T> _withRetry<T>(Future<T> Function() fn, {int attempt = 1}) async {
     try {
@@ -2235,29 +2200,21 @@ class ApiClient {
       await _delay(attempt);
       return _withRetry(fn, attempt: attempt + 1);
     } on SocketException {
-      if (attempt >= AppApi.maxRetries) _throwMaintenance();
+      if (attempt >= AppApi.maxRetries) _throwNetwork();
       await _delay(attempt);
       return _withRetry(fn, attempt: attempt + 1);
     } on TimeoutException {
-      if (attempt >= AppApi.maxRetries) _throwMaintenance();
+      if (attempt >= AppApi.maxRetries) _throwNetwork();
       await _delay(attempt);
       return _withRetry(fn, attempt: attempt + 1);
-    } on HandshakeException {
-      _throwMaintenance();
     }
-//    throw const ApiException('Unexpected error');
   }
 
   Future<void> _delay(int attempt) =>
       Future.delayed(Duration(milliseconds: AppApi.retryDelayMs * attempt));
 
-  Never _throwMaintenance() => throw const ApiException(
-        'The server is under maintenance. Please try again after some time.',
-      );
-
-  // ─────────────────────────────────────────────────────────
-  //  Response handling
-  // ─────────────────────────────────────────────────────────
+  Never _throwNetwork() =>
+      throw const ApiException('Server under maintenance. Please try again later.');
 
   dynamic _handleResponse(http.Response response) {
     final dynamic data = _tryDecode(response.body);
@@ -2267,39 +2224,27 @@ class ApiClient {
   }
 
   dynamic _tryDecode(String body) {
-    try {
-      return jsonDecode(body);
-    } catch (_) {
-      return body;
-    }
+    try { return jsonDecode(body); } catch (_) { return body; }
   }
 
   String? _extractMessage(dynamic data) {
-    if (data is Map) {
-      return (data['message'] ?? data['error'] ?? data['detail'])?.toString();
-    }
+    if (data is Map) return (data['message'] ?? data['error'] ?? data['detail'])?.toString();
     return null;
   }
 
   String _defaultMessage(int status) => switch (status) {
-        400 => 'Bad request. Please check your input.',
-        401 => 'Session expired. Please log in again.',
-        403 => 'You do not have permission to perform this action.',
-        404 => 'The requested resource was not found.',
-        408 => 'Request timed out. Please try again.',
-        429 => 'Too many requests. Please slow down.',
-        500 => 'Internal server error. Please try again later.',
-        502 => 'Bad gateway. Please try again later.',
-        503 => 'Service unavailable. Please try again later.',
-        _   => 'Unexpected error (HTTP $status).',
-      };
+    400 => 'Bad request. Please check your input.',
+    401 => 'Session expired. Please log in again.',
+    403 => 'You do not have permission to perform this action.',
+    404 => 'The requested resource was not found.',
+    429 => 'Too many requests. Please slow down.',
+    500 => 'Internal server error. Please try again later.',
+    503 => 'Service unavailable. Please try again later.',
+    _   => 'Unexpected error (HTTP \$status).',
+  };
 
-  void dispose() {
-    _client?.close();
-    _client = null;
-  }
+  void dispose() { _client?.close(); _client = null; }
 }
-
 EOF
 
     _dart "lib/core/network/api/api_endpoints.dart"; cat > "${B}/lib/core/network/api/api_endpoints.dart" << EOF
@@ -2330,6 +2275,7 @@ EOF
     _dart "lib/core/network/interceptors/auth_interceptor.dart"
     _dart "lib/core/network/interceptors/logging_interceptor.dart"
   fi
+
   if [[ "$API_CHOICE" == "3" || "$API_CHOICE" == "5" ]]; then
     _dart "lib/core/network/api/api_firebase.dart"
   fi
@@ -2451,8 +2397,8 @@ abstract final class CacheKeys {
 }
 EOF
 
-# ── 2. CACHE POLICY ──────────────────────────────────────────
-_dart "lib/core/cache/cache_policy.dart"; cat > "${B}/lib/core/cache/cache_policy.dart" << EOF
+  _dart "lib/core/cache/cache_policy.dart"
+  cat > "${B}/lib/core/cache/cache_policy.dart" << 'EOF'
 // ─────────────────────────────────────────────────────────────
 // CachePolicy
 //
@@ -2875,8 +2821,7 @@ export 'cache_policy.dart';
 export 'cache_manager.dart';
 EOF
 
-
-
+  # ── services ─────────────────────────────────────────────────────
   _dart "lib/core/services/navigation_service.dart"
   _dart "lib/core/services/storage_service.dart"
   _yes "$F_PUSH"          && _dart "lib/core/services/notification_service.dart"
@@ -2887,12 +2832,62 @@ EOF
   _yes "$F_SENTRY"        && _dart "lib/core/services/crash_reporting_service.dart"
   _yes "$F_REMOTE_CONFIG" && _dart "lib/core/services/remote_config_service.dart"
 
-# ── Admob service ────────────────────────────────────────────
-_dart "lib/core/services/admob_service.dart"; cat > "${B}/lib/core/services/admob_service.dart" << 'EOF'
+  # FIX: connectivity_service.dart only created when F_CONNECTIVITY=y
+  if _yes "$F_CONNECTIVITY"; then
+    _dart "lib/core/services/connectivity_service.dart"
+    cat > "${B}/lib/core/services/connectivity_service.dart" << EOF
+import 'dart:async';
+import 'package:connectivity_plus/connectivity_plus.dart';
+
+class ConnectivityService {
+  static final ConnectivityService _instance = ConnectivityService._internal();
+  factory ConnectivityService() => _instance;
+  ConnectivityService._internal();
+
+  final Connectivity _connectivity = Connectivity();
+  final StreamController<bool> _controller = StreamController<bool>.broadcast();
+
+  bool _isConnected = true;
+  bool get isConnected => _isConnected;
+  Stream<bool> get connectivityStream => _controller.stream;
+
+  Future<void> initialize() async {
+    await _checkConnectivity();
+    _connectivity.onConnectivityChanged.listen(_handleChange);
+  }
+
+  Future<void> _checkConnectivity() async {
+    final results = await _connectivity.checkConnectivity();
+    _handleChange(results);
+  }
+
+  void _handleChange(List<ConnectivityResult> results) {
+    final wasConnected = _isConnected;
+    _isConnected = results.isNotEmpty && !results.contains(ConnectivityResult.none);
+    if (wasConnected != _isConnected) _controller.add(_isConnected);
+  }
+
+  Future<bool> checkConnectivity() async {
+    final results = await _connectivity.checkConnectivity();
+    _isConnected = results.isNotEmpty && !results.contains(ConnectivityResult.none);
+    return _isConnected;
+  }
+
+  void dispose() => _controller.close();
+}
+EOF
+  fi
+
+  # FIX: AdMob service only created when F_ADS=y
+  if _yes "$F_ADS"; then
+    _dart "lib/core/services/admob_service.dart"
+    cat > "${B}/lib/core/services/admob_service.dart" << 'EOF'
 import 'dart:math';
-import 'package:flutter/widgets.dart';
+
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:injectable/injectable.dart';
 import 'package:rohit/core/network/api/api_client.dart';
 import 'package:rohit/core/network/api/api_endpoints.dart';
 import 'package:rohit/core/utils/helpers/admob_helper.dart';
@@ -2936,14 +2931,19 @@ class EmptyAdEventDelegate implements AdEventDelegate {
 typedef VoidCallback = void Function();
 
 /// Service class for managing Google Mobile Ads
-/// Can be used as:
-/// - Singleton: AdService.instance.showRewardedAd()
+@lazySingleton
 class AdService extends ChangeNotifier {
+  // static final AdService instance = AdService();
+  // AdService()
+  //     : _delegate = EmptyAdEventDelegate(),
+  //       _showProbability = 0.5;
   static final AdService _instance = AdService._internal();
+  AdService._internal()
+      : _delegate = EmptyAdEventDelegate(),
+        _showProbability = 0.5;
 
   /// Singleton instance - use anywhere with AdService.instance
   static AdService get instance => _instance;
-
   InterstitialAd? _interstitialAd;
   RewardedAd? _rewardedAd;
   BannerAd? _bannerAd;
@@ -2954,9 +2954,7 @@ class AdService extends ChangeNotifier {
   bool _adsIsActive = false; // Default to true, will be updated from API
   bool _adsStatusLoaded = false;
 
-  AdService._internal()
-    : _delegate = EmptyAdEventDelegate(),
-      _showProbability = 0.5;
+// Class members continue...
 
   /// Whether the ad service has been initialized
   bool get isInitialized => _isInitialized;
@@ -2987,18 +2985,16 @@ class AdService extends ChangeNotifier {
   /// Returns true if ads are enabled, false if disabled
   Future<bool> fetchAdsStatus() async {
     try {
-      final response = await ApiClient()
-          .get(ApiEndpoints.adsStatus)
-          .timeout(
-            const Duration(seconds: 5),
-            onTimeout: () {
-              debugPrint('Ads status timeout - assuming ads active');
-              return {
-                'success': false,
-                'data': {'adsIsActive': false},
-              };
-            },
-          );
+      final response = await ApiClient().get(ApiEndpoints.adsStatus).timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          debugPrint('Ads status timeout - assuming ads active');
+          return {
+            'success': false,
+            'data': {'adsIsActive': false},
+          };
+        },
+      );
       if (response['success'] == true && response['data'] != null) {
         _adsIsActive = response['data']['adsIsActive'] ?? true;
         _adsStatusLoaded = true;
@@ -3255,75 +3251,12 @@ class AdService extends ChangeNotifier {
   }
 }
 EOF
+  fi
 
-
-# ── Connectivity Service ────────────────────────────────────────────
-_yes "$F_CONNECTIVITY" && _dart "lib/core/services/connectivity_service.dart"; cat > "${B}/lib/core/services/connectivity_service.dart" << EOF
-import 'dart:async';
-import 'package:connectivity_plus/connectivity_plus.dart';
-
-class ConnectivityService {
-  static final ConnectivityService _instance = ConnectivityService._internal();
-  factory ConnectivityService() => _instance;
-  ConnectivityService._internal();
-
-  final Connectivity _connectivity = Connectivity();
-
-  // Stream controller to broadcast connectivity changes
-  final StreamController<bool> _connectivityController = StreamController<bool>.broadcast();
-
-  // Current connectivity status
-  bool _isConnected = true;
-  bool get isConnected => _isConnected;
-
-  // Stream for listening to connectivity changes
-  Stream<bool> get connectivityStream => _connectivityController.stream;
-
-  // Initialize and start listening
-  Future<void> initialize() async {
-    // Check initial connectivity
-    await _checkConnectivity();
-
-    // Listen to connectivity changes
-    _connectivity.onConnectivityChanged.listen((List<ConnectivityResult> results) {
-      _handleConnectivityChange(results);
-    });
-  }
-
-  Future<void> _checkConnectivity() async {
-    final results = await _connectivity.checkConnectivity();
-    _handleConnectivityChange(results);
-  }
-
-  void _handleConnectivityChange(List<ConnectivityResult> results) {
-    final wasConnected = _isConnected;
-    _isConnected = results.isNotEmpty &&
-                   !results.contains(ConnectivityResult.none);
-
-    // Only emit if there's a change
-    if (wasConnected != _isConnected) {
-      _connectivityController.add(_isConnected);
-    }
-  }
-
-  // Manual check for current connectivity
-  Future<bool> checkConnectivity() async {
-    final results = await _connectivity.checkConnectivity();
-    _isConnected = results.isNotEmpty &&
-                   !results.contains(ConnectivityResult.none);
-    return _isConnected;
-  }
-
-  // Dispose the stream controller
-  void dispose() {
-    _connectivityController.close();
-  }
-}
-EOF
-
-
-# ── in app review ────────────────────────────────────────────
-_dart "lib/core/services/in_app_review_service.dart"; cat > "${B}/lib/core/services/in_app_review_service.dart" << EOF
+  # FIX: in_app_review service only created when F_IN_APP_REVIEW=y
+  if _yes "$F_IN_APP_REVIEW"; then
+    _dart "lib/core/services/in_app_review_service.dart"
+    cat > "${B}/lib/core/services/in_app_review_service.dart" << EOF
 import 'package:flutter/foundation.dart';
 import 'package:in_app_review/in_app_review.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -3421,36 +3354,13 @@ class InAppReviewService {
     }
   }
 }
-
 EOF
+  fi
 
-_dart "lib/core/services/service.dart"; cat > "${B}/lib/core/services/service.dart" << EOF
-// Core Services Barrel Export
-// This file exports all services for easy importing
-
-// ===== Firebase Services =====
-export 'firebase/firebase_auth_service.dart';
-export 'firebase/firebase_messaging_service.dart';
-export 'firebase/firebase_service.dart';
-
-// ===== Core Services =====
-export 'admob_service.dart';
-export 'analytics_service.dart';
-export 'connectivity_service.dart';
-export 'crash_reporting_service.dart';
-export 'in_app_review_service.dart';
-export 'local_notification_service.dart';
-export 'navigation_service.dart';
-export 'notification_service.dart';
-export 'permission_service.dart';
-export 'remote_config_service.dart';
-export 'share_service.dart';
-export 'storage_service.dart';
-export 'update_service.dart';
-EOF
-
-# ── update ────────────────────────────────────────────
-_dart "lib/core/services/update_service.dart"; cat > "${B}/lib/core/services/update_service.dart" << EOF
+  # FIX: in_app_update service only created when F_IN_APP_UPDATE=y
+  if _yes "$F_IN_APP_UPDATE"; then
+    _dart "lib/core/services/update_service.dart"
+    cat > "${B}/lib/core/services/update_service.dart" << 'EOF'
 import 'package:flutter/material.dart';
 import 'package:in_app_update/in_app_update.dart';
 
@@ -3564,14 +3474,33 @@ class UpdateService {
   }
 }
 EOF
+  fi
 
+  # FIX: Firebase services only created when Firebase is actually needed
+  if $_NEEDS_FB_CORE; then
+    _dart "lib/core/services/firebase/firebase_service.dart"
+    cat > "${B}/lib/core/services/firebase/firebase_service.dart" << EOF
+import 'package:firebase_core/firebase_core.dart';
 
-if _yes "$F_FIREBASE_AUTH"; then
-  mkdir -p "${B}/lib/core/services/firebase"
-  mkdir -p "${B}/lib/data/models"
+export 'firebase_auth_service.dart';
+export 'firebase_messaging_service.dart';
 
-  # ── User model ────────────────────────────────────────────
-  _dart "lib/data/models/user_model.dart"; cat > "${B}/lib/data/models/user_model.dart" << EOF
+class FirebaseService {
+  FirebaseService._();
+
+  static Future<void> initialize() async {
+    await Firebase.initializeApp(
+      // options: DefaultFirebaseOptions.currentPlatform, // uncomment after flutterfire configure
+    );
+  }
+}
+EOF
+  fi
+
+  if _yes "$F_FIREBASE_AUTH"; then
+    mkdir -p "${B}/lib/data/models"
+    _dart "lib/data/models/user_model.dart"
+    cat > "${B}/lib/data/models/user_model.dart" << 'EOF'
 class UserModel {
   final int id;
   final String firebaseUid;
@@ -3619,25 +3548,9 @@ class UserModel {
 }
 EOF
 
-
- _dart "lib/core/services/firebase/firebase_service.dart"; cat > "${B}/lib/core/services/firebase/firebase_service.dart" << EOF
-import 'package:firebase_core/firebase_core.dart';
-
-export 'firebase_auth_service.dart';
-export 'firebase_messaging_service.dart';
-
-class FirebaseService {
-  FirebaseService._();
-
-  static Future<void> initialize() async {
-    await Firebase.initializeApp(
-      // options: DefaultFirebaseOptions.currentPlatform, // uncomment after flutterfire configure
-    );
-  }
-}
-EOF
-
- _dart "lib/core/services/firebase/firebase_auth_service.dart"; cat > "${B}/lib/core/services/firebase/firebase_auth_service.dart" << 'EOF'
+    # FIX: package name uses ${PROJECT_NAME}
+    _dart "lib/core/services/firebase/firebase_auth_service.dart"
+    cat > "${B}/lib/core/services/firebase/firebase_auth_service.dart" << 'EOF'
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -3752,8 +3665,11 @@ class AuthService {
   }
 }
 EOF
+  fi
 
- _dart "lib/core/services/firebase/firebase_messaging_service.dart"; cat > "${B}/lib/core/services/firebase/firebase_messaging_service.dart" << 'EOF'
+  if _yes "$F_PUSH"; then
+    _dart "lib/core/services/firebase/firebase_messaging_service.dart"
+    cat > "${B}/lib/core/services/firebase/firebase_messaging_service.dart" << 'EOF'
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 
@@ -3821,23 +3737,36 @@ class FirebaseApi {
   // ── Notification tapped while app was terminated ──────────
   Future<RemoteMessage?> getInitialMessage() => _fcm.getInitialMessage();
 }
-
 EOF
+  fi
 
-fi
+  # FIX: service.dart barrel only exports files that were actually created
+  _dart "lib/core/services/service.dart"
+  {
+    echo "// Core Services Barrel Export"
+    echo ""
+    $_NEEDS_FB_CORE && echo "export 'firebase/firebase_service.dart';"
+    _yes "$F_FIREBASE_AUTH" && echo "export 'firebase/firebase_auth_service.dart';"
+    _yes "$F_PUSH"          && echo "export 'firebase/firebase_messaging_service.dart';"
+    echo "export 'navigation_service.dart';"
+    echo "export 'storage_service.dart';"
+    _yes "$F_ADS"           && echo "export 'admob_service.dart';"
+    _yes "$F_ANALYTICS"     && echo "export 'analytics_service.dart';"
+    _yes "$F_CONNECTIVITY"  && echo "export 'connectivity_service.dart';"
+    _yes "$F_SENTRY"        && echo "export 'crash_reporting_service.dart';"
+    _yes "$F_IN_APP_REVIEW" && echo "export 'in_app_review_service.dart';"
+    _yes "$F_LOCAL_NOTIF"   && echo "export 'local_notification_service.dart';"
+    _yes "$F_PUSH"          && echo "export 'notification_service.dart';"
+    _yes "$F_PERMISSIONS"   && echo "export 'permission_service.dart';"
+    _yes "$F_REMOTE_CONFIG" && echo "export 'remote_config_service.dart';"
+    _yes "$F_SHARE"         && echo "export 'share_service.dart';"
+    _yes "$F_IN_APP_UPDATE" && echo "export 'update_service.dart';"
+  } > "${B}/lib/core/services/service.dart"
 
-  _dart "lib/core/theme/app_theme.dart"; cat > "${B}/lib/core/theme/app_theme.dart" << EOF
-import 'package:flutter/material.dart';
-import 'package:${PROJECT_NAME}/core/theme/light_theme.dart';
-import 'package:${PROJECT_NAME}/core/theme/dark_theme.dart';
-
-class AppTheme {
-  static ThemeData get lightTheme => lightThemeData;
-  static ThemeData get darkTheme => darkThemeData;
-}
-EOF
-
-  _yes "$F_THEME" && _dart "lib/core/theme/light_theme.dart"; cat > "${B}/lib/core/theme/light_theme.dart" << EOF
+  # ── theme ─────────────────────────────────────────────────────────
+  # FIX: always create light_theme and dark_theme since app_theme always imports them
+  _dart "lib/core/theme/light_theme.dart"
+  cat > "${B}/lib/core/theme/light_theme.dart" << EOF
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:${PROJECT_NAME}/core/constants/app_colors.dart';
@@ -4022,10 +3951,10 @@ ThemeData lightThemeData = ThemeData(
     ),
   ),
 );
-
 EOF
 
-  _yes "$F_THEME" && _dart "lib/core/theme/dark_theme.dart"; cat > "${B}/lib/core/theme/dark_theme.dart" << EOF
+  _dart "lib/core/theme/dark_theme.dart"
+  cat > "${B}/lib/core/theme/dark_theme.dart" << EOF
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:${PROJECT_NAME}/core/constants/app_colors.dart';
@@ -4212,10 +4141,21 @@ ThemeData darkThemeData = ThemeData(
 );
 EOF
 
-# ============================================================
-# 8. CORE — Extensions
-# ============================================================
-  _dart "lib/core/utils/extensions/context_extensions.dart";cat > "${B}/lib/core/utils/extensions/context_extensions.dart" << 'EOF'
+  _dart "lib/core/theme/app_theme.dart"
+  cat > "${B}/lib/core/theme/app_theme.dart" << EOF
+import 'package:flutter/material.dart';
+import 'package:${PROJECT_NAME}/core/theme/light_theme.dart';
+import 'package:${PROJECT_NAME}/core/theme/dark_theme.dart';
+
+class AppTheme {
+  static ThemeData get lightTheme => lightThemeData;
+  static ThemeData get darkTheme  => darkThemeData;
+}
+EOF
+
+  # ── utils ─────────────────────────────────────────────────────────
+  _dart "lib/core/utils/extensions/context_extensions.dart"
+  cat > "${B}/lib/core/utils/extensions/context_extensions.dart" << 'EOF'
 import 'package:flutter/material.dart';
 
 extension ContextExtensions on BuildContext {
@@ -4246,64 +4186,34 @@ extension ContextExtensions on BuildContext {
 }
 EOF
 
-  _dart "lib/core/utils/extensions/string_extensions.dart";cat > "${B}/lib/core/utils/extensions/string_extensions.dart" << 'EOF'
+  _dart "lib/core/utils/extensions/string_extensions.dart"
+  cat > "${B}/lib/core/utils/extensions/string_extensions.dart" << 'EOF'
 extension StringExtensions on String {
   bool get isValidEmail =>
-      RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
-          .hasMatch(this);
-
-  bool get isValidPhone =>
-      RegExp(r'^\+?[0-9]{10,13}$').hasMatch(this);
-
+      RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$').hasMatch(this);
+  bool get isValidPhone    => RegExp(r'^\+?[0-9]{10,13}$').hasMatch(this);
   bool get isValidPassword => length >= 8;
-
-  String get capitalize =>
-      isEmpty ? this : '${this[0].toUpperCase()}${substring(1)}';
-
-  String get titleCase => split(' ').map((w) => w.capitalize).join(' ');
-
-  String? get nullIfEmpty => isEmpty ? null : this;
+  String get capitalize    => isEmpty ? this : '${this[0].toUpperCase()}${substring(1)}';
+  String get titleCase     => split(' ').map((w) => w.capitalize).join(' ');
+  String? get nullIfEmpty  => isEmpty ? null : this;
 }
 
 extension NullableStringExtensions on String? {
   bool get isNullOrEmpty => this == null || this!.isEmpty;
-  String get orEmpty => this ?? '';
+  String get orEmpty     => this ?? '';
 }
 EOF
 
-
-#   _dart "lib/core/utils/extensions/date_time_extensions.dart";cat > "${B}/lib/core/utils/extensions/date_time_extensions.dart" << 'EOF'
-# import 'package:intl/intl.dart';
-
-# extension DateExtensions on DateTime {
-#   String get formatted => DateFormat('dd MMM yyyy').format(this);
-#   String get formattedWithTime => DateFormat('dd MMM yyyy, hh:mm a').format(this);
-#   String get timeOnly => DateFormat('hh:mm a').format(this);
-#   String get monthYear => DateFormat('MMMM yyyy').format(this);
-#   bool get isToday {
-#     final now = DateTime.now();
-#     return year == now.year && month == now.month && day == now.day;
-#   }
-#   bool get isYesterday {
-#     final yesterday = DateTime.now().subtract(const Duration(days: 1));
-#     return year == yesterday.year &&
-#         month == yesterday.month &&
-#         day == yesterday.day;
-#   }
-# }
-# EOF
-
   _dart "lib/core/utils/formatters/date_formatter.dart"
   _dart "lib/core/utils/formatters/number_formatter.dart"
-
-  _dart "lib/core/utils/validators/validators.dart";cat > "${B}/lib/core/utils/validators/validators.dart" << 'EOF'
+  _dart "lib/core/utils/validators/validators.dart"
+  cat > "${B}/lib/core/utils/validators/validators.dart" << 'EOF'
 class Validators {
   Validators._();
 
   static String? email(String? value) {
     if (value == null || value.isEmpty) return 'Email is required';
-    final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
-    if (!emailRegex.hasMatch(value)) return 'Enter a valid email';
+    if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) return 'Enter a valid email';
     return null;
   }
 
@@ -4320,8 +4230,7 @@ class Validators {
 
   static String? phone(String? value) {
     if (value == null || value.isEmpty) return 'Phone number is required';
-    final phoneRegex = RegExp(r'^\+?[0-9]{10,13}$');
-    if (!phoneRegex.hasMatch(value)) return 'Enter a valid phone number';
+    if (!RegExp(r'^\+?[0-9]{10,13}$').hasMatch(value)) return 'Enter a valid phone number';
     return null;
   }
 
@@ -4333,7 +4242,8 @@ class Validators {
 }
 EOF
 
-  _dart "lib/core/utils/helpers/theme_helper.dart";cat > "${B}/lib/core/utils/helpers/theme_helper.dart" << EOF
+  _dart "lib/core/utils/helpers/theme_helper.dart"
+  cat > "${B}/lib/core/utils/helpers/theme_helper.dart" << EOF
 // ─────────────────────────────────────────────
 // THEME HELPER  –  return correct token
 // based on current brightness (light/dark mode).
@@ -4398,15 +4308,22 @@ class AppColorScheme {
 }
 EOF
 
-  _dart "lib/core/utils/helpers/helper.dart";cat > "${B}/lib/core/utils/helpers/helper.dart" << 'EOF'
+cat > "${B}/lib/core/utils/helpers/helper.dart" << EOF
 // ─────────────────────────────────────────────────────────────
-// helper barrel export.
+// Helper barrel export.
 // ─────────────────────────────────────────────────────────────
+$(
+  if _yes "$F_ADS"; then
+    echo "export 'admob_helper.dart';"
+  fi
 
-export 'admob_helper.dart';
-export 'theme_helper.dart';
+  if _yes "$F_THEME"; then
+    echo "export 'theme_helper.dart';"
+  fi
+)
 EOF
 
+if _yes "$F_ADS"; then
   _dart "lib/core/utils/helpers/admob_helper.dart";cat > "${B}/lib/core/utils/helpers/admob_helper.dart" << 'EOF'
 import 'dart:io';
 
@@ -4451,8 +4368,63 @@ class AdHelper {
   }
 }
 EOF
+fi
 
-  _yes "$F_DI" &&  _dart "lib/core/di/injection_container.dart"; cat > "${B}/lib/core/di/injection_container.dart" << 'EOF'
+  # FIX: core_initializer.dart imports and calls only what's actually enabled
+  _dart "lib/core/utils/initializers/core_initializer.dart"
+  {
+    echo "import 'dart:async';"
+    echo "import 'package:flutter/material.dart';"
+    echo "import 'package:flutter/services.dart';"
+    if _yes "$F_DI"; then
+      echo "import 'package:${PROJECT_NAME}/core/di/injection_container.dart';"
+    fi
+    if $_NEEDS_FB_CORE; then
+      echo "import 'package:${PROJECT_NAME}/core/services/firebase/firebase_service.dart';"
+    fi
+    if _yes "$F_ADS"; then
+      echo "import 'package:google_mobile_ads/google_mobile_ads.dart';"
+      echo "import 'package:${PROJECT_NAME}/core/services/admob_service.dart';"
+    fi
+    if _yes "$F_CONNECTIVITY"; then
+      echo "import 'package:${PROJECT_NAME}/core/services/connectivity_service.dart';"
+    fi
+    echo ""
+    echo "class CoreInitializer {"
+    echo "  static Future<void> init() async {"
+    echo "    WidgetsFlutterBinding.ensureInitialized();"
+    echo ""
+    if _yes "$F_DI"; then
+      echo "    await configureDependencies();"
+      echo ""
+    fi
+    if $_NEEDS_FB_CORE; then
+      echo "    try { await FirebaseService.initialize(); }"
+      echo "    catch (e) { debugPrint('Firebase init skipped: \$e'); }"
+      echo ""
+    fi
+    echo "    await SystemChrome.setPreferredOrientations(["
+    echo "      DeviceOrientation.portraitUp,"
+    echo "      DeviceOrientation.portraitDown,"
+    echo "    ]);"
+    echo ""
+    if _yes "$F_ADS"; then
+      echo "    await MobileAds.instance.initialize();"
+      echo "    unawaited(AdService.instance.initialize());"
+      echo ""
+    fi
+    if _yes "$F_CONNECTIVITY"; then
+      echo "    unawaited(ConnectivityService().initialize());"
+      echo ""
+    fi
+    echo "  }"
+    echo "}"
+  } > "${B}/lib/core/utils/initializers/core_initializer.dart"
+
+  # ── DI ────────────────────────────────────────────────────────────
+  if _yes "$F_DI"; then
+    _dart "lib/core/di/injection_container.dart"
+    cat > "${B}/lib/core/di/injection_container.dart" << EOF
 import 'package:get_it/get_it.dart';
 import 'package:injectable/injectable.dart';
 
@@ -4468,7 +4440,8 @@ final GetIt getIt = GetIt.instance;
 Future<void> configureDependencies() async => getIt.init();
 EOF
 
-  _yes "$F_DI" &&  _dart "lib/core/di/injection_container.config.dart"; cat > "${B}/lib/core/di/injection_container.config.dart" << 'EOF'
+    _dart "lib/core/di/injection_container.config.dart"
+    cat > "${B}/lib/core/di/injection_container.config.dart" << 'EOF'
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
 // **************************************************************************
@@ -4493,16 +4466,14 @@ extension GetItInjectableX on _i174.GetIt {
   }
 }
 EOF
-
-
+  fi
 
   if _yes "$F_LOGGING"; then
     _dart "lib/core/logger/app_logger.dart"
     _dart "lib/core/logger/log_printer.dart"
   fi
 
-  # _dart "lib/core/resources/color_manager.dart"
-
+  # ── feature stubs ────────────────────────────────────────────────
   _dart "lib/features/auth/data/datasources/auth_local_datasource.dart"
   _dart "lib/features/auth/data/datasources/auth_remote_datasource.dart"
   _dart "lib/features/auth/data/models/user_model.dart"
@@ -4579,24 +4550,19 @@ EOF
     done
   fi
 
-  if _yes "$F_MAPS"; then
-    _dart "lib/features/maps/presentation/pages/map_screen.dart"
-    _dart "lib/features/maps/presentation/widgets/map_widget.dart"
-  fi
-
+  _yes "$F_MAPS" && { _dart "lib/features/maps/presentation/pages/map_screen.dart"; _dart "lib/features/maps/presentation/widgets/map_widget.dart"; }
   if _yes "$F_CHARTS"; then
     _dart "lib/features/dashboard/presentation/pages/dashboard_screen.dart"
     _dart "lib/features/dashboard/presentation/widgets/chart_widget.dart"
     _dart "lib/features/dashboard/presentation/widgets/stats_card.dart"
   fi
-
   if _yes "$F_ONBOARDING"; then
     _dart "lib/features/onboarding/presentation/pages/onboarding_screen.dart"
     _dart "lib/features/onboarding/presentation/widgets/onboarding_page.dart"
   fi
-
   _yes "$F_SPLASH" && _dart "lib/features/splash/presentation/pages/splash_screen.dart"
 
+  # ── shared widgets ────────────────────────────────────────────────
   _dart "lib/shared/widgets/buttons/primary_button.dart"
   _dart "lib/shared/widgets/buttons/secondary_button.dart"
   _dart "lib/shared/widgets/buttons/icon_text_button.dart"
@@ -4606,182 +4572,138 @@ EOF
   _dart "lib/shared/widgets/dialogs/success_dialog.dart"
   _dart "lib/shared/widgets/dialogs/confirm_dialog.dart"
   _dart "lib/shared/widgets/inputs/custom_text_field.dart"
-  _dart "lib/shared/widgets/inputs/search_bar.dart"
+  _dart "lib/shared/widgets/inputs/search_bar_widget.dart"
   _dart "lib/shared/widgets/inputs/dropdown_field.dart"
   _dart "lib/shared/widgets/layouts/custom_app_bar.dart"
   _yes "$F_BOTTOM_NAV" && _dart "lib/shared/widgets/layouts/bottom_nav_bar.dart"
   _yes "$F_DRAWER"     && _dart "lib/shared/widgets/layouts/drawer_menu.dart"
-  _dart "lib/shared/widgets/feedback/error_widget.dart"
+  _dart "lib/shared/widgets/feedback/app_error_widget.dart"
   _dart "lib/shared/widgets/feedback/loading_widget.dart"
   _dart "lib/shared/widgets/feedback/empty_state_widget.dart"
   _dart "lib/shared/widgets/feedback/snackbar_utils.dart"
   _dart "lib/shared/mixins/validation_mixin.dart"
   _dart "lib/shared/mixins/loading_mixin.dart"
 
+  # ── routes ────────────────────────────────────────────────────────
   _dart "lib/routes/app_pages.dart"
+  _dart "lib/routes/navigator_key.dart"
+  cat > "${B}/lib/routes/navigator_key.dart" << 'EOF'
+import 'package:flutter/material.dart';
+
+class MyNavigatorKey {
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+}
+EOF
   if _yes "$F_GOROUTER" || _yes "$F_AUTOROUTE"; then
     _dart "lib/routes/guards/auth_guard.dart"
     _dart "lib/routes/guards/role_guard.dart"
   fi
 
-# ── app.dart ────────────────────────────────────────────
-_dart "lib/app.dart"; cat > "${B}/lib/app.dart" << EOF
+  # ── app.dart — FIX: no longer hardcodes GetX; adapts to SM_CHOICE ─
+  _dart "lib/app.dart"
+  {
+    echo "import 'package:flutter/material.dart';"
+    echo "import 'package:flutter_screenutil/flutter_screenutil.dart';"
+    echo "import 'package:${PROJECT_NAME}/core/theme/app_theme.dart';"
+    echo "import 'package:${PROJECT_NAME}/routes/navigator_key.dart';"
+    if _yes "$F_IN_APP_REVIEW"; then
+      echo "import 'package:${PROJECT_NAME}/core/services/in_app_review_service.dart';"
+    fi
+    if _yes "$F_IN_APP_UPDATE"; then
+      echo "import 'package:${PROJECT_NAME}/core/services/update_service.dart';"
+    fi
+    if [[ "$SM_CHOICE" == "3" ]]; then
+      echo "import 'package:get/get.dart';"
+    fi
+    echo ""
+    echo "class MyApp extends StatefulWidget {"
+    echo "  const MyApp({super.key});"
+    echo "  @override"
+    echo "  State<MyApp> createState() => _MyAppState();"
+    echo "}"
+    echo ""
+    echo "class _MyAppState extends State<MyApp> with WidgetsBindingObserver {"
+    echo "  @override"
+    echo "  void initState() {"
+    echo "    super.initState();"
+    echo "    WidgetsBinding.instance.addObserver(this);"
+    if _yes "$F_IN_APP_REVIEW"; then
+      echo "    WidgetsBinding.instance.addPostFrameCallback((_) {"
+      echo "      InAppReviewService.instance.checkAndRequestReview();"
+      echo "    });"
+    fi
+    echo "  }"
+    echo ""
+    echo "  @override"
+    echo "  void dispose() {"
+    echo "    WidgetsBinding.instance.removeObserver(this);"
+    echo "    super.dispose();"
+    echo "  }"
+    echo ""
+    echo "  @override"
+    echo "  void didChangeAppLifecycleState(AppLifecycleState state) {"
+    echo "    super.didChangeAppLifecycleState(state);"
+    if _yes "$F_IN_APP_UPDATE"; then
+      echo "    if (state == AppLifecycleState.resumed) {"
+      echo "      WidgetsBinding.instance.addPostFrameCallback((_) {"
+      echo "        final ctx = MyNavigatorKey.navigatorKey.currentContext;"
+      echo "        if (ctx != null) UpdateService().checkForUpdate(ctx);"
+      echo "      });"
+      echo "    }"
+    fi
+    echo "  }"
+    echo ""
+    echo "  @override"
+    echo "  Widget build(BuildContext context) {"
+    echo "    return ScreenUtilInit("
+    echo "      designSize: const Size(360, 690),"
+    echo "      minTextAdapt: true,"
+    echo "      splitScreenMode: true,"
+    echo "      builder: (context, child) {"
+    if [[ "$SM_CHOICE" == "3" ]]; then
+      echo "        return GetMaterialApp("
+    else
+      echo "        return MaterialApp("
+    fi
+    echo "          navigatorKey: MyNavigatorKey.navigatorKey,"
+    echo "          title: '${PROJECT_NAME}',"
+    echo "          debugShowCheckedModeBanner: false,"
+    echo "          theme: AppTheme.lightTheme,"
+    echo "          darkTheme: AppTheme.darkTheme,"
+    echo "          themeMode: ThemeMode.system,"
+    echo "          home: const _HomeStub(),"
+    echo "        );"
+    echo "      },"
+    echo "    );"
+    echo "  }"
+    echo "}"
+    echo ""
+    echo "class _HomeStub extends StatelessWidget {"
+    echo "  const _HomeStub();"
+    echo "  @override"
+    echo "  Widget build(BuildContext context) {"
+    echo "    return Scaffold("
+    echo "      appBar: AppBar(title: const Text('${PROJECT_NAME}')),"
+    echo "      body: const Center(child: Text('Hello, World!')),"
+    echo "    );"
+    echo "  }"
+    echo "}"
+  } > "${B}/lib/app.dart"
+
+  # ── main.dart ─────────────────────────────────────────────────────
+  _dart "lib/main.dart"
+  cat > "${B}/lib/main.dart" << EOF
 import 'package:flutter/material.dart';
-
-class MainApp extends StatefulWidget {
-  const MainApp({super.key});
-
-  @override
-  State<MainApp> createState() => _MainAppState();
-}
-
-class _MainAppState extends State<MainApp> {
-  @override
-  Widget build(BuildContext context) {
-    return const Text('Hello World');
-  }
-}
-EOF
-
-
-  # ── main.dart ────────────────────────────────────────────
-  _dart "lib/main.dart"; cat > "${B}/lib/main.dart" << EOF
-import 'dart:async';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:get/get.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:${PROJECT_NAME}/app.dart';
-import 'package:${PROJECT_NAME}/core/services/service.dart';
-import 'package:${PROJECT_NAME}/core/theme/app_theme.dart';
-import 'package:${PROJECT_NAME}/core/utils/helpers/theme_helper.dart';
-
-// Global navigator key for accessing context from anywhere
-class MyNavigatorKey {
-  static final GlobalKey<NavigatorState> navigatorKey =
-      GlobalKey<NavigatorState>();
-}
+import 'package:${PROJECT_NAME}/core/utils/initializers/core_initializer.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  // Automatic according to the theme
-  final brightness =
-      WidgetsBinding.instance.platformDispatcher.platformBrightness;
-
-  SystemChrome.setSystemUIOverlayStyle(
-    // AppColorScheme.overlayStyle(Brightness.light),
-    AppColorScheme.overlayStyle(brightness),
-  );
-
-  // Pre-initialize AdService before UI loads (non-blocking)
-  // This avoids initializing on every screen
-  unawaited(AdService.instance.initialize(showProbability: 0.3));
-
-  // Initialize connectivity service (non-blocking)
-  unawaited(ConnectivityService().initialize());
-
-  // Set preferred orientations (portrait only)
-  SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
-
-  // Google Admob
-  MobileAds.instance.initialize();
-  await _initializeFirebaseSafely();
-
+  await CoreInitializer.init();
   runApp(const MyApp());
-}
-
-Future<void> _initializeFirebaseSafely() async {
-  try {
-    await Firebase.initializeApp();
-  } catch (error) {
-    debugPrint('Firebase initialization skipped: $error');
-  }
-}
-
-class MyApp extends StatefulWidget {
-  const MyApp({super.key});
-
-  @override
-  State<MyApp> createState() => _MyAppState();
-}
-
-class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      InAppReviewService.instance.checkAndRequestReview();
-    });
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
-    WidgetsBinding.instance.removeObserver(this);
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    super.didChangeAppLifecycleState(state);
-
-    // Handle app lifecycle for performance optimization
-    switch (state) {
-      case AppLifecycleState.paused:
-      case AppLifecycleState.inactive:
-        // App is in background or inactive - reduce resource usage
-        break;
-      case AppLifecycleState.resumed:
-        // App is resumed - check for app updates
-        _checkForUpdates();
-        break;
-      case AppLifecycleState.detached:
-        // App is being terminated - cleanup
-        _cleanup();
-        break;
-      case AppLifecycleState.hidden:
-        // App is hidden
-        break;
-    }
-  }
-
-  // Google Play Store New Update
-  void _checkForUpdates() {
-    // Use post frame callback to ensure context is ready
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final BuildContext? context = MyNavigatorKey.navigatorKey.currentContext;
-      if (context != null) {
-        UpdateService().checkForUpdate(context);
-      }
-    });
-  }
-
-  void _cleanup() {
-    // Dispose services when app terminates
-    AdService.instance.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GetMaterialApp(
-      navigatorKey: MyNavigatorKey.navigatorKey,
-      title: 'MyApp',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system,
-      home: const MainApp(),
-    );
-  }
 }
 EOF
 
-
+  # ── tests ─────────────────────────────────────────────────────────
   if _yes "$F_UNIT_TEST"; then
     _dart "test/unit/features/auth/auth_usecase_test.dart"
     for F in "${SM_FILES[@]}"; do
@@ -4794,12 +4716,11 @@ EOF
     touch "${B}/test/fixtures/user_fixture.json"
     touch "${B}/test/fixtures/auth_fixture.json"
   fi
-
   if _yes "$F_WIDGET_TEST"; then
     _dart "test/widget/features/auth_widget_test.dart"
     _dart "test/widget/shared/shared_widgets_test.dart"
   fi
-
+  rm -f "${B}/test/widget_test.dart"
   if _yes "$F_INTEGRATION_TEST"; then
     _dart "test/integration/app_test.dart"
     _dart "test/integration/auth_flow_test.dart"
@@ -4810,8 +4731,6 @@ EOF
   # ════════════════════════════════════════════════════════════════
 
   # ── pubspec.yaml ─────────────────────────────────────────────────
-  # FIX: Dependencies written from arrays — no stray blank lines from unset variables.
-  #      SDK constraint written without embedded literal quotes.
   {
     cat << EOF
 name: ${PROJECT_NAME}
@@ -4854,7 +4773,6 @@ EOF
     for line in "${_DEPS_DEV[@]}"; do printf '%s\n' "$line"; done
   } > "${B}/pubspec.yaml"
 
-  # Guard — if pubspec somehow ended up without name: field, inject it
   if ! grep -q "^name:" "${B}/pubspec.yaml"; then
     sed -i "1s/^/name: ${PROJECT_NAME}\n/" "${B}/pubspec.yaml"
     echo -e "  ${YELLOW}⚠ name: field was missing — auto-injected.${RESET}"
@@ -4949,30 +4867,19 @@ Thumbs.db
 *.iml
 EOF
 
-  # ── .env.example ─────────────────────────────────────────────────
+  # ── .env / .env.example ──────────────────────────────────────────
   {
     cat << EOF
-# ─── App ──────────────────────────────────────────
 APP_NAME=${PROJECT_NAME}
 APP_ENV=development
 BASE_URL=https://api.example.com/v1
-
-# ─── Firebase ─────────────────────────────────────
-FIREBASE_PROJECT_ID=
-FIREBASE_API_KEY=
 EOF
-    if [[ -n "$_ENV_MAPS" ]]; then
-      printf '\n# ─── Maps ─────────────────────────────────────────\n'
-      printf '%s\n' "$_ENV_MAPS"
+    if $_NEEDS_FB_CORE; then
+      printf '\n# Firebase\nFIREBASE_PROJECT_ID=\nFIREBASE_API_KEY=\n'
     fi
-    if [[ -n "$_ENV_PAYMENT" ]]; then
-      printf '\n# ─── Payment ──────────────────────────────────────\n'
-      printf '%s\n' "$_ENV_PAYMENT"
-    fi
-    if [[ -n "$_ENV_SENTRY" ]]; then
-      printf '\n# ─── Sentry ───────────────────────────────────────\n'
-      printf '%s\n' "$_ENV_SENTRY"
-    fi
+    [[ -n "$_ENV_MAPS" ]]    && printf '\n# Maps\n%s\n' "$_ENV_MAPS"
+    [[ -n "$_ENV_PAYMENT" ]] && printf '\n# Payment\n%s\n' "$_ENV_PAYMENT"
+    [[ -n "$_ENV_SENTRY" ]]  && printf '\n# Sentry\n%s\n' "$_ENV_SENTRY"
   } > "${B}/.env.example"
   cp "${B}/.env.example" "${B}/.env"
 
@@ -4981,7 +4888,6 @@ EOF
 .PHONY: help run build build-ios test test-coverage clean gen gen-watch setup-local
 
 help:
-	@echo "Available commands:"
 	@echo "  make run              - Run debug build"
 	@echo "  make build            - Build release APK"
 	@echo "  make build-ios        - Build iOS release"
@@ -4993,16 +4899,8 @@ help:
 	@echo "  make setup-local      - Generate android/local.properties from env"
 
 setup-local:
-	@if [ -z "$$ANDROID_HOME" ]; then \
-		echo "⚠  ANDROID_HOME is not set. Set it first:"; \
-		echo "   export ANDROID_HOME=/home/rohit/Android/Sdk"; \
-		exit 1; \
-	fi
-	@if [ -z "$$FLUTTER_ROOT" ]; then \
-		echo "⚠  FLUTTER_ROOT is not set. Set it first:"; \
-		echo "   export FLUTTER_ROOT=/home/rohit/flutter"; \
-		exit 1; \
-	fi
+	@if [ -z "$$ANDROID_HOME" ]; then echo "⚠  Set ANDROID_HOME first"; exit 1; fi
+	@if [ -z "$$FLUTTER_ROOT" ]; then echo "⚠  Set FLUTTER_ROOT first"; exit 1; fi
 	@echo "sdk.dir=$$ANDROID_HOME"            > android/local.properties
 	@echo "flutter.sdk=$$FLUTTER_ROOT"       >> android/local.properties
 	@echo "flutter.buildMode=debug"          >> android/local.properties
@@ -5036,18 +4934,10 @@ gen-watch:
 	flutter pub run build_runner watch --delete-conflicting-outputs
 MAKEOF
 
-  # Append flavor targets if enabled
-  if _yes "$F_FLAVORS"; then
-    cat >> "${B}/Makefile" << 'EOF'
-
-EOF
-  fi
-
-  # ── GitHub Actions CI/CD ─────────────────────────────────────────
+  # ── GitHub Actions ───────────────────────────────────────────────
   if _yes "$F_CICD"; then
     cat > "${B}/.github/workflows/ci.yml" << EOF
 name: Flutter CI
-
 on:
   push:
     branches: [master, develop]
@@ -5060,25 +4950,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
           flutter-version: '${_FLUTTER_VERSION}'
           channel: 'stable'
           cache: true
-      - name: Install dependencies
-        run: flutter pub get
-      - name: Run code generation
-        run: flutter pub run build_runner build --delete-conflicting-outputs
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test --coverage
         continue-on-error: true
-      - name: Analyze
-        run: flutter analyze
-      - name: Run tests
-        run: flutter test --coverage
-      - name: Upload coverage
-        uses: codecov/codecov-action@v3
-        with:
-          file: coverage/lcov.info
 
   build-android:
     name: Build Android
@@ -5086,19 +4966,16 @@ jobs:
     needs: test
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
           flutter-version: '${_FLUTTER_VERSION}'
           channel: 'stable'
           cache: true
-      - name: Install dependencies
-        run: flutter pub get
-      - name: Build APK
-        run: flutter build apk --debug
+      - run: flutter pub get
+      - run: flutter build apk --debug
 EOF
 
-    cat > "${B}/.github/workflows/android-release.yml" << EOF
+   cat > "${B}/.github/workflows/android-release.yml" << EOF
 name: Android Release Build
 
 on:
@@ -5200,7 +5077,7 @@ jobs:
 EOF
   fi
 
-  # ── GitHub Issue Templates ────────────────────────────────────────
+  # ── GitHub Issue Templates ───────────────────────────────────────
   if _yes "$F_ISSUES"; then
     cat > "${B}/.github/ISSUE_TEMPLATE/bug_report.yml" << 'EOF'
 name: 🐛 Bug Report
@@ -5249,7 +5126,6 @@ body:
     validations:
       required: true
 EOF
-
     cat > "${B}/.github/ISSUE_TEMPLATE/feature_request.yml" << 'EOF'
 name: 🚀 Feature Request
 description: Suggest a new feature
@@ -5257,26 +5133,13 @@ labels: ["enhancement"]
 body:
   - type: textarea
     id: problem
-    attributes:
-      label: Problem / motivation
-    validations:
-      required: true
+    attributes: { label: Problem / motivation }
+    validations: { required: true }
   - type: textarea
     id: solution
-    attributes:
-      label: Proposed solution
-    validations:
-      required: true
-  - type: textarea
-    id: alternatives
-    attributes:
-      label: Alternatives considered
-  - type: textarea
-    id: mockups
-    attributes:
-      label: Mockups / screenshots
+    attributes: { label: Proposed solution }
+    validations: { required: true }
 EOF
-
     cat > "${B}/.github/ISSUE_TEMPLATE/config.yml" << 'EOF'
 blank_issues_enabled: false
 EOF
@@ -5287,56 +5150,30 @@ EOF
     cat > "${B}/.github/PULL_REQUEST_TEMPLATE.md" << 'EOF'
 ## 📋 Description
 
-<!-- What does this PR do? Closes #? -->
-
 ## 🔄 Type of Change
-
 - [ ] 🐛 Bug fix
 - [ ] 🚀 New feature
 - [ ] 💥 Breaking change
-- [ ] 🎨 UI / UX improvement
 - [ ] ♻️  Refactor
 - [ ] 📝 Documentation
-- [ ] 🧪 Tests only
 
 ## 🧪 Testing
-
 - [ ] Unit tests added / updated
-- [ ] Widget tests added / updated
 - [ ] Tested on Android
-- [ ] Tested on iOS
 - [ ] All tests pass (`flutter test`)
 
 ## ✅ Checklist
-
 - [ ] `flutter analyze` passes
 - [ ] No debug `print()` statements left
 - [ ] `.env.example` updated if new env vars added
-- [ ] CHANGELOG updated
-
-## 📸 Screenshots
-
-| Before | After |
-|--------|-------|
-|        |       |
-
-## 🔗 Related Issues / PRs
 EOF
   fi
 
-  # ── CODEOWNERS ───────────────────────────────────────────────────
-  if _yes "$F_CODEOWNERS"; then
-    cat > "${B}/.github/CODEOWNERS" << 'EOF'
-# Global
-* @your-username
-
-# Core
-lib/core/ @your-username
-lib/features/auth/ @your-username
+  _yes "$F_CODEOWNERS" && cat > "${B}/.github/CODEOWNERS" << 'EOF'
+* @rohitbhure65
+lib/core/ @rohitbhure65
 EOF
-  fi
 
-  # ── CHANGELOG ────────────────────────────────────────────────────
   if _yes "$F_CHANGELOG"; then
     cat > "${B}/CHANGELOG.md" << EOF
 # Changelog

@@ -2099,6 +2099,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
+import 'package:injectable/injectable.dart';
 import 'package:${PROJECT_NAME}/core/constants/app_api.dart';
 
 class ApiException implements Exception {
@@ -2118,6 +2119,9 @@ abstract class TokenProvider {
   Future<String?> refreshAccessToken();
 }
 
+/// HTTP client with retry logic and token management
+/// Uses Dependency Injection - register with get_it
+@singleton
 class ApiClient {
   ApiClient();
 
@@ -2838,16 +2842,17 @@ EOF
     cat > "${B}/lib/core/services/connectivity_service.dart" << EOF
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:injectable/injectable.dart';
 
+/// Service for monitoring network connectivity
+/// Uses Dependency Injection - register with get_it
+@singleton
 class ConnectivityService {
-  static final ConnectivityService _instance = ConnectivityService._internal();
-  factory ConnectivityService() => _instance;
-  ConnectivityService._internal();
-
-  final Connectivity _connectivity = Connectivity();
+  final Connectivity _connectivity;
   final StreamController<bool> _controller = StreamController<bool>.broadcast();
 
   bool _isConnected = true;
+  ConnectivityService(this._connectivity);
   bool get isConnected => _isConnected;
   Stream<bool> get connectivityStream => _controller.stream;
 
@@ -2931,19 +2936,15 @@ class EmptyAdEventDelegate implements AdEventDelegate {
 typedef VoidCallback = void Function();
 
 /// Service class for managing Google Mobile Ads
+/// Uses Dependency Injection via @lazySingleton - do not use manual singleton pattern
 @lazySingleton
 class AdService extends ChangeNotifier {
-  // static final AdService instance = AdService();
-  // AdService()
-  //     : _delegate = EmptyAdEventDelegate(),
-  //       _showProbability = 0.5;
-  static final AdService _instance = AdService._internal();
-  AdService._internal()
+  final ApiClient _apiClient;
+
+  AdService(this._apiClient)
       : _delegate = EmptyAdEventDelegate(),
         _showProbability = 0.5;
 
-  /// Singleton instance - use anywhere with AdService.instance
-  static AdService get instance => _instance;
   InterstitialAd? _interstitialAd;
   RewardedAd? _rewardedAd;
   BannerAd? _bannerAd;
@@ -2985,7 +2986,7 @@ class AdService extends ChangeNotifier {
   /// Returns true if ads are enabled, false if disabled
   Future<bool> fetchAdsStatus() async {
     try {
-      final response = await ApiClient().get(ApiEndpoints.adsStatus).timeout(
+      final response = await _apiClient.get(ApiEndpoints.adsStatus).timeout(
         const Duration(seconds: 5),
         onTimeout: () {
           debugPrint('Ads status timeout - assuming ads active');
@@ -3062,7 +3063,6 @@ class AdService extends ChangeNotifier {
     } else {
       // Ads are disabled on server, don't load ads
       _isInitialized = false;
-      // debugPrint('Ads are disabled on server. Not loading ads.');
     }
 
     notifyListeners();
@@ -3259,23 +3259,27 @@ EOF
     cat > "${B}/lib/core/services/in_app_review_service.dart" << EOF
 import 'package:flutter/foundation.dart';
 import 'package:in_app_review/in_app_review.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:injectable/injectable.dart';
+import 'package:rohit/core/cache/cache_manager.dart';
+import 'package:rohit/core/cache/cache_keys.dart';
 
+/// Service for managing in-app review requests
+/// Uses Dependency Injection - register with get_it
+@singleton
 class InAppReviewService {
-  InAppReviewService._();
-
-  static final InAppReviewService instance = InAppReviewService._();
-
   static const String _reviewSubmittedKey = 'review_submitted';
   static const String _reviewRequestedKey = 'review_requested';
+
+  final CacheManager _cacheManager;
+
+  InAppReviewService(this._cacheManager);
 
   InAppReview get _inAppReview => InAppReview.instance;
 
   /// Returns true if the user has already submitted a review.
   Future<bool> hasUserSubmittedReview() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      return prefs.getBool(_reviewSubmittedKey) ?? false;
+      return _cacheManager.getBool(_reviewSubmittedKey, defaultValue: false);
     } catch (e) {
       debugPrint('Error reading review submission status: $e');
       return false;
@@ -3285,8 +3289,7 @@ class InAppReviewService {
   /// Returns true if the in-app review flow has already been triggered.
   Future<bool> hasReviewBeenRequested() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      return prefs.getBool(_reviewRequestedKey) ?? false;
+      return _cacheManager.getBool(_reviewRequestedKey, defaultValue: false);
     } catch (e) {
       debugPrint('Error reading review request status: $e');
       return false;
@@ -3298,7 +3301,7 @@ class InAppReviewService {
     try {
       return await _inAppReview.isAvailable();
     } catch (e) {
-      debugPrint('In-app review availability check failed: $e');
+      debugPrint('In-app review availability check failed: ');
       return false;
     }
   }
@@ -3306,8 +3309,7 @@ class InAppReviewService {
   /// Marks that the review flow has been triggered.
   Future<void> _markReviewRequested() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_reviewRequestedKey, true);
+      await _cacheManager.setBool(_reviewRequestedKey, value: true);
     } catch (e) {
       debugPrint('Error saving review request status: $e');
     }
@@ -3316,8 +3318,7 @@ class InAppReviewService {
   /// Marks that the user submitted a review.
   Future<void> markReviewSubmitted() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_reviewSubmittedKey, true);
+      await _cacheManager.setBool(_reviewSubmittedKey, value: true);
     } catch (e) {
       debugPrint('Error saving review submitted status: $e');
     }
@@ -3350,7 +3351,7 @@ class InAppReviewService {
 
       debugPrint('In-app review flow completed.');
     } catch (e) {
-      debugPrint('Error requesting in-app review: $e');
+      debugPrint('Error requesting in-app review: ');
     }
   }
 }
@@ -3361,19 +3362,45 @@ EOF
   if _yes "$F_IN_APP_UPDATE"; then
     _dart "lib/core/services/update_service.dart"
     cat > "${B}/lib/core/services/update_service.dart" << 'EOF'
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:in_app_update/in_app_update.dart';
+import 'package:injectable/injectable.dart';
 
+/// Delegate interface for update UI events
+/// Allows the service to trigger UI without depending on Flutter widgets
+abstract class UpdateUIDelegate {
+  void showUpdateDialog({required VoidCallback onUpdate, VoidCallback? onLater});
+  void showUpdateFailedSnackbar();
+}
+
+/// Default empty implementation for testing
+class EmptyUpdateUIDelegate implements UpdateUIDelegate {
+  @override
+  void showUpdateDialog({required VoidCallback onUpdate, VoidCallback? onLater}) {
+    debugPrint('Update dialog requested (no delegate set)');
+  }
+
+  @override
+  void showUpdateFailedSnackbar() {
+    debugPrint('Update failed snackbar requested (no delegate set)');
+  }
+}
+
+/// Service for managing app updates
+/// Uses Dependency Injection - register with get_it
+@singleton
 class UpdateService {
-  static final UpdateService _instance = UpdateService._internal();
-  factory UpdateService() => _instance;
-  UpdateService._internal();
+  UpdateService() : _delegate = EmptyUpdateUIDelegate();
 
   bool _isChecking = false;
   bool _updateStarted = false;
+  UpdateUIDelegate _delegate;
 
-  /// Check for app updates and show dialog if available
-  Future<void> checkForUpdate(BuildContext context) async {
+  /// Set the UI delegate for showing dialogs and snackbars
+  set delegate(UpdateUIDelegate delegate) => _delegate = delegate;
+
+  /// Check for app updates and notify delegate if available
+  Future<void> checkForUpdate() async {
     if (_isChecking || _updateStarted) return;
     _isChecking = true;
 
@@ -3381,51 +3408,21 @@ class UpdateService {
       final AppUpdateInfo updateInfo = await InAppUpdate.checkForUpdate();
 
       if (updateInfo.updateAvailability == UpdateAvailability.updateAvailable) {
-        if (context.mounted) {
-          _showUpdateDialog(context, updateInfo);
-        }
+        _delegate.showUpdateDialog(
+          onUpdate: () => _startImmediateUpdate(),
+          onLater: () => _isChecking = false,
+        );
+      } else {
+        _isChecking = false;
       }
     } catch (e) {
       debugPrint('Error checking for updates: $e');
-    } finally {
       _isChecking = false;
     }
   }
 
-  /// Show update available dialog
-  void _showUpdateDialog(BuildContext context, AppUpdateInfo updateInfo) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Update Available'),
-        content: const Text(
-          'A new version of the app is available. Would you like to update now?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: Text(
-              'Later',
-              style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600]),
-            ),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              _startImmediateUpdate(context);
-            },
-            child: const Text('Update'),
-          ),
-        ],
-      ),
-    );
-  }
-
   /// Start immediate update (user must stay on screen)
-  Future<void> _startImmediateUpdate(BuildContext context) async {
+  Future<void> _startImmediateUpdate() async {
     _updateStarted = true;
 
     try {
@@ -3433,39 +3430,13 @@ class UpdateService {
 
       if (updateInfo.updateAvailability == UpdateAvailability.updateAvailable) {
         await InAppUpdate.performImmediateUpdate();
-        // If we get here, update was successful
         debugPrint('Update completed successfully');
       }
     } catch (e) {
       debugPrint('Error during immediate update: $e');
-      if (context.mounted) {
-        _showUpdateFailedSnackbar(context);
-      }
+      _delegate.showUpdateFailedSnackbar();
       _updateStarted = false;
     }
-  }
-
-  /// Show snackbar when update fails
-  void _showUpdateFailedSnackbar(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Row(
-          children: [
-            Icon(Icons.error_outline, color: Colors.white),
-            SizedBox(width: 12),
-            Text('Update failed. Please try again later.'),
-          ],
-        ),
-        backgroundColor: isDark ? Colors.white : Colors.black,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
-        margin: const EdgeInsets.all(16),
-      ),
-    );
   }
 
   /// Reset update flag (can be called after app restart)
@@ -3554,10 +3525,14 @@ EOF
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:injectable/injectable.dart';
 import 'package:rohit/core/network/api/api_client.dart';
 import 'package:rohit/core/network/api/api_endpoints.dart';
 import 'package:rohit/data/models/user_model.dart';
 
+/// Service for Firebase authentication
+/// Uses Dependency Injection - register with get_it
+@singleton
 class AuthService {
   // ── Firebase & Google ─────────────────────────────────────
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -3566,7 +3541,9 @@ class AuthService {
     scopes: ['email', 'https://www.googleapis.com/auth/userinfo.profile'],
   );
 
-  final ApiClient _apiClient = ApiClient();
+  final ApiClient _apiClient;
+
+  AuthService(this._apiClient);
 
   // ── State ─────────────────────────────────────────────────
   UserModel? _dbUser;
@@ -4410,11 +4387,11 @@ fi
     echo ""
     if _yes "$F_ADS"; then
       echo "    await MobileAds.instance.initialize();"
-      echo "    unawaited(AdService.instance.initialize());"
+      echo "    unawaited(getIt<AdService>().initialize());"
       echo ""
     fi
     if _yes "$F_CONNECTIVITY"; then
-      echo "    unawaited(ConnectivityService().initialize());"
+      echo "    unawaited(getIt<ConnectivityService>().initialize());"
       echo ""
     fi
     echo "  }"
@@ -4606,6 +4583,9 @@ EOF
     echo "import 'package:flutter_screenutil/flutter_screenutil.dart';"
     echo "import 'package:${PROJECT_NAME}/core/theme/app_theme.dart';"
     echo "import 'package:${PROJECT_NAME}/routes/navigator_key.dart';"
+    if _yes "$F_DI"; then
+    echo "import 'package:${PROJECT_NAME}/core/di/injection_container.dart';"
+    fi
     if _yes "$F_IN_APP_REVIEW"; then
       echo "import 'package:${PROJECT_NAME}/core/services/in_app_review_service.dart';"
     fi
@@ -4629,7 +4609,8 @@ EOF
     echo "    WidgetsBinding.instance.addObserver(this);"
     if _yes "$F_IN_APP_REVIEW"; then
       echo "    WidgetsBinding.instance.addPostFrameCallback((_) {"
-      echo "      InAppReviewService.instance.checkAndRequestReview();"
+      echo "      final reviewService = getIt<InAppReviewService>();"
+      echo "      reviewService.checkAndRequestReview();"
       echo "    });"
     fi
     echo "  }"
@@ -4647,7 +4628,11 @@ EOF
       echo "    if (state == AppLifecycleState.resumed) {"
       echo "      WidgetsBinding.instance.addPostFrameCallback((_) {"
       echo "        final ctx = MyNavigatorKey.navigatorKey.currentContext;"
-      echo "        if (ctx != null) UpdateService().checkForUpdate(ctx);"
+      echo "        if (ctx != null) {"
+      echo "          final updateService = getIt<UpdateService>();"
+      echo "          updateService.delegate = _AppUpdateUIDelegate(ctx);"
+      echo "          updateService.checkForUpdate();"
+      echo "        }"
       echo "      });"
       echo "    }"
     fi
@@ -4685,6 +4670,67 @@ EOF
     echo "    return Scaffold("
     echo "      appBar: AppBar(title: const Text('${PROJECT_NAME}')),"
     echo "      body: const Center(child: Text('Hello, World!')),"
+    echo "    );"
+    echo "  }"
+    echo "}"
+    echo ""
+    echo "/// UI delegate implementation for UpdateService"
+    echo "/// Handles showing dialogs and snackbars in the app context"
+    echo "class _AppUpdateUIDelegate implements UpdateUIDelegate {"
+    echo "  final BuildContext context;"
+    echo "  _AppUpdateUIDelegate(this.context);"
+    echo "  @override"
+    echo "  void showUpdateDialog({required VoidCallback onUpdate, VoidCallback? onLater}) {"
+    echo "    final isDark = Theme.of(context).brightness == Brightness.dark;"
+    echo "    showDialog("
+    echo "      context: context,"
+    echo "      barrierDismissible: false,"
+    echo "      builder: (dialogContext) => AlertDialog("
+    echo "        title: const Text('Update Available'),"
+    echo "        content: const Text("
+    echo "          'A new version of the app is available. Would you like to update now?',"
+    echo "        ),"
+    echo "        actions: ["
+    echo "          TextButton("
+    echo "            onPressed: () {"
+    echo "              Navigator.pop(dialogContext);"
+    echo "              onLater?.call();"
+    echo "            },"
+    echo "            child: Text("
+    echo "              'Later',"
+    echo "              style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600]),"
+    echo "            ),"
+    echo "          ),"
+    echo "          TextButton("
+    echo "            onPressed: () {"
+    echo "              Navigator.pop(dialogContext);"
+    echo "              onUpdate();"
+    echo "            },"
+    echo "            child: const Text('Update'),"
+    echo "          ),"
+    echo "        ],"
+    echo "      ),"
+    echo "    );"
+    echo "  }"
+    echo "  @override"
+    echo "  void showUpdateFailedSnackbar() {"
+    echo "    final isDark = Theme.of(context).brightness == Brightness.dark;"
+    echo "    ScaffoldMessenger.of(context).showSnackBar("
+    echo "      SnackBar("
+    echo "        content: const Row("
+    echo "          children: ["
+    echo "            Icon(Icons.error_outline, color: Colors.white),"
+    echo "            SizedBox(width: 12),"
+    echo "            Text('Update failed. Please try again later.'),"
+    echo "          ],"
+    echo "        ),"
+    echo "        backgroundColor: isDark ? Colors.white : Colors.black,"
+    echo "        behavior: SnackBarBehavior.floating,"
+    echo "        shape: RoundedRectangleBorder("
+    echo "          borderRadius: BorderRadius.circular(10),"
+    echo "        ),"
+    echo "        margin: const EdgeInsets.all(16),"
+    echo "      ),"
     echo "    );"
     echo "  }"
     echo "}"

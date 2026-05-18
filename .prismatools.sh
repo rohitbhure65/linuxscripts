@@ -548,6 +548,8 @@ prismahelp_schema() {
   echo -e "  ${GREEN}  updatedAt DateTime @updatedAt                     ${DIM}// auto-updates on every save${RESET}"
   echo -e "  ${GREEN}  data      Json?                                   ${DIM}// store any JSON${RESET}"
   echo -e "  ${GREEN}  bytes     Bytes?                                  ${DIM}// binary data${RESET}"
+  echo -e "  ${GREEN}  favoritedBy User? @relation("favorite", fields: [favoritedById], references: [id])  ${DIM}// Relation to another User${RESET}"
+  echo -e "  ${GREEN}  categories Category[]                             ${DIM}// One user can have multiple categories${RESET}"
   echo ""
   echo -e "  ${DIM}  // ── Block-level attributes ────────────────────────────────────${RESET}"
   echo -e "  ${DIM}  // @@unique([name, email])     → composite unique (name+email combo)${RESET}"
